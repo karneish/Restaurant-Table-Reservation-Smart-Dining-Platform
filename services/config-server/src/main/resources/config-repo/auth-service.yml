@@ -1,0 +1,19 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: jdbc:postgresql://postgres:5432/ticket_booking
+    username: ticket_user
+    password: root123
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+app:
+  jwt:
+    secret: dGhpcyBpcyBhIHNlY3JldCBrZXkgZm9yIHRpY2tldCBib29raW5nIHN5c3RlbSB3aXRoIFNwcmluZyBCb290IGFuZCBKV1Q=
+    expiration-ms: 86400000
+    refresh-expiration-ms: 2592000000

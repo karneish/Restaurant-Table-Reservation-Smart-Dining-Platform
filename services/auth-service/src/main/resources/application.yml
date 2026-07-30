@@ -1,0 +1,40 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ticket_booking
+    username: ticket_user
+    password: root123
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        jdbc:
+          lob:
+            non_contextual_creation: true
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    preferIpAddress: true
+
+app:
+  jwt:
+    secret: dGhpcyBpcyBhIHNlY3JldCBrZXkgZm9yIHRpY2tldCBib29raW5nIHN5c3RlbSB3aXRoIFNwcmluZyBCb290IGFuZCBKV1Q=
+    expiration-ms: 86400000
+    refresh-expiration-ms: 2592000000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

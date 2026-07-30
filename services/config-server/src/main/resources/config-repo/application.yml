@@ -1,0 +1,55 @@
+# Shared configuration for all services
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    date-format: yyyy-MM-dd HH:mm:ss
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      booking-service:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+  retry:
+    instances:
+      booking-service:
+        maxRetryAttempts: 3
+        waitDuration: 1s
+        retryExceptions:
+          - org.springframework.dao.ConcurrencyFailureException
+  ratelimiter:
+    instances:
+      booking-service:
+        limitForPeriod: 10
+        limitRefreshPeriod: 1s
+        timeoutDuration: 0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,circuitbreakers
+  metrics:
+    tags:
+      application: ${spring.application.name}

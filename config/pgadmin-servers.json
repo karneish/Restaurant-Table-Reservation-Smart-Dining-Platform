@@ -1,0 +1,15 @@
+{
+    "Servers": {
+        "1": {
+            "Name": "Ticket Booking DB",
+            "Group": "Servers",
+            "Host": "postgres",
+            "Port": 5432,
+            "MaintenanceDB": "ticket_booking",
+            "Username": "ticket_user",
+            "Password": "root123",
+            "SSLMode": "prefer",
+            "PassFile": "/tmp/pgpassfile"
+        }
+    }
+}
