@@ -16,6 +16,14 @@
         <dependency>
             <groupId>com.ticketbooking</groupId>
             <artifactId>common</artifactId>
+            <exclusions>
+                <!-- Spring Cloud Gateway is reactive (WebFlux); common's servlet
+                     web starter is only for the MVC-based business services. -->
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.springframework.cloud</groupId>
