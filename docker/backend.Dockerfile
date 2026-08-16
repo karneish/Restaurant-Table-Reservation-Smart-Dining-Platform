@@ -36,4 +36,5 @@ COPY --from=builder /build/services/${MODULE}/target/${MODULE}-1.0.0.jar app.jar
 EXPOSE ${PORT}
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=6 \
     CMD curl -fsS http://localhost:${PORT}/actuator/health || exit 1
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Cap the JVM heap to the container so it stays healthy on Render's 512 MB free plan.
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70", "-Xss512k", "-XX:+UseSerialGC", "-jar", "app.jar"]
