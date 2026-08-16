@@ -1,12 +1,14 @@
+name: ticket-booking-system
+
 services:
-  # ─── PostgreSQL Database ───────────────────────────────────────────
+  # ─── PostgreSQL 18 (primary database) ─────────────────────────────
   postgres:
-    image: postgres:16-alpine
-    container_name: ticket-booking-db
+    image: postgres:18-alpine
+    container_name: ticket-booking-postgres
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: ticket_booking
+      POSTGRES_DB: ticket_booking_system_db
       POSTGRES_USER: ticket_user
       POSTGRES_PASSWORD: root123
     volumes:
@@ -14,12 +16,12 @@ services:
     networks:
       - ticket-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ticket_user -d ticket_booking"]
+      test: ["CMD-SHELL", "pg_isready -U ticket_user -d ticket_booking_system_db"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # ─── pgAdmin4 ──────────────────────────────────────────────────────
+  # ─── pgAdmin4 (database management UI) ────────────────────────────
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: ticket-booking-pgadmin
@@ -31,33 +33,37 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
       - ./config/pgadmin-servers.json:/pgadmin4/servers.json
+      - ./config/pgpass:/tmp/pgpassfile:ro
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - ticket-network
 
-  # ─── Service Registry ──────────────────────────────────────────────
+  # ─── Service Registry (Eureka) ────────────────────────────────────
   service-registry:
     build:
-      context: ./services/service-registry
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: docker/backend.Dockerfile
+      args:
+        MODULE: service-registry
+        PORT: 8761
     container_name: ticket-booking-registry
     ports:
       - "8761:8761"
     networks:
       - ticket-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
 
-  # ─── Config Server ─────────────────────────────────────────────────
+  # ─── Config Server ────────────────────────────────────────────────
   config-server:
     build:
-      context: ./services/config-server
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: docker/backend.Dockerfile
+      args:
+        MODULE: config-server
+        PORT: 8888
     container_name: ticket-booking-config
     ports:
       - "8888:8888"
@@ -69,27 +75,43 @@ services:
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
 
-  # ─── API Gateway (main entry point named ticket-booking) ───────────
+  # ─── API Gateway (main entry point) ───────────────────────────────
   ticket-booking:
     build:
-      context: ./services/api-gateway
-      dockerfile: Dockerfile
-    container_name: ticket-booking
+      context: .
+      dockerfile: docker/backend.Dockerfile
+      args:
+        MODULE: api-gateway
+        PORT: 8080
+    container_name: ticket-booking-gateway
     ports:
       - "8080:8080"
     depends_on:
-      - service-registry
-      - config-server
+      service-registry:
+        condition: service_healthy
+      config-server:
+        condition: service_started
     networks:
       - ticket-network
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+      - AUTH_SERVICE_URL=http://auth-service:8081
+      - USER_SERVICE_URL=http://user-service:8082
+      - RESTAURANT_SERVICE_URL=http://restaurant-service:8083
+      - TABLE_SERVICE_URL=http://table-service:8084
+      - SLOT_SERVICE_URL=http://slot-service:8085
+      - RESERVATION_SERVICE_URL=http://reservation-service:8086
+      - PAYMENT_SERVICE_URL=http://payment-service:8087
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8088
 
-  # ─── Auth Service ──────────────────────────────────────────────────
+  # ─── Auth Service ─────────────────────────────────────────────────
   auth-service:
     build:
-      context: ./services/auth-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: docker/backend.Dockerfile
+      args:
+        MODULE: auth-service
+        PORT: 8081
     container_name: ticket-booking-auth
     ports:
       - "8081:8081"
@@ -101,16 +123,19 @@ services:
     networks:
       - ticket-network
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ticket_booking
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ticket_booking_system_db
       - SPRING_DATASOURCE_USERNAME=ticket_user
       - SPRING_DATASOURCE_PASSWORD=root123
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
 
-  # ─── User Service ──────────────────────────────────────────────────
+  # ─── User Service ─────────────────────────────────────────────────
   user-service:
     build:
-      context: ./services/user-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: docker/backend.Dockerfile
+      args:
+        MODULE: user-service
+        PORT: 8082
     container_name: ticket-booking-user
     ports:
       - "8082:8082"
@@ -122,17 +147,20 @@ services:
     networks:
       - ticket-network
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ticket_booking
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ticket_booking_system_db
       - SPRING_DATASOURCE_USERNAME=ticket_user
       - SPRING_DATASOURCE_PASSWORD=root123
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
 
-  # ─── Movie Service ─────────────────────────────────────────────────
-  movie-service:
+  # ─── Restaurant Service ───────────────────────────────────────────
+  restaurant-service:
     build:
-      context: ./services/movie-service
-      dockerfile: Dockerfile
-    container_name: ticket-booking-movie
+      context: .
+      dockerfile: docker/backend.Dockerfile
+      args:
+        MODULE: restaurant-service
+        PORT: 8083
+    container_name: ticket-booking-restaurant
     ports:
       - "8083:8083"
     depends_on:
@@ -143,17 +171,20 @@ services:
     networks:
       - ticket-network
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ticket_booking
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ticket_booking_system_db
       - SPRING_DATASOURCE_USERNAME=ticket_user
       - SPRING_DATASOURCE_PASSWORD=root123
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
 
-  # ─── Theatre Service ───────────────────────────────────────────────
-  theatre-service:
+  # ─── Table Service ────────────────────────────────────────────────
+  table-service:
     build:
-      context: ./services/theatre-service
-      dockerfile: Dockerfile
-    container_name: ticket-booking-theatre
+      context: .
+      dockerfile: docker/backend.Dockerfile
+      args:
+        MODULE: table-service
+        PORT: 8084
+    container_name: ticket-booking-table
     ports:
       - "8084:8084"
     depends_on:
@@ -164,17 +195,20 @@ services:
     networks:
       - ticket-network
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ticket_booking
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ticket_booking_system_db
       - SPRING_DATASOURCE_USERNAME=ticket_user
       - SPRING_DATASOURCE_PASSWORD=root123
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
 
-  # ─── Show Service ──────────────────────────────────────────────────
-  show-service:
+  # ─── Slot Service ─────────────────────────────────────────────────
+  slot-service:
     build:
-      context: ./services/show-service
-      dockerfile: Dockerfile
-    container_name: ticket-booking-show
+      context: .
+      dockerfile: docker/backend.Dockerfile
+      args:
+        MODULE: slot-service
+        PORT: 8085
+    container_name: ticket-booking-slot
     ports:
       - "8085:8085"
     depends_on:
@@ -185,17 +219,21 @@ services:
     networks:
       - ticket-network
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ticket_booking
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ticket_booking_system_db
       - SPRING_DATASOURCE_USERNAME=ticket_user
       - SPRING_DATASOURCE_PASSWORD=root123
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+      - TABLE_SERVICE_URL=http://table-service:8084
 
-  # ─── Booking Service ───────────────────────────────────────────────
-  booking-service:
+  # ─── Reservation Service ──────────────────────────────────────────
+  reservation-service:
     build:
-      context: ./services/booking-service
-      dockerfile: Dockerfile
-    container_name: ticket-booking-book
+      context: .
+      dockerfile: docker/backend.Dockerfile
+      args:
+        MODULE: reservation-service
+        PORT: 8086
+    container_name: ticket-booking-reservation
     ports:
       - "8086:8086"
     depends_on:
@@ -203,22 +241,25 @@ services:
         condition: service_healthy
       service-registry:
         condition: service_healthy
-      redis:
-        condition: service_started
     networks:
       - ticket-network
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ticket_booking
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ticket_booking_system_db
       - SPRING_DATASOURCE_USERNAME=ticket_user
       - SPRING_DATASOURCE_PASSWORD=root123
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
-      - SPRING_REDIS_HOST=redis
+      - TABLE_SERVICE_URL=http://table-service:8084
+      - SLOT_SERVICE_URL=http://slot-service:8085
+      - RESTAURANT_SERVICE_URL=http://restaurant-service:8083
 
-  # ─── Payment Service ───────────────────────────────────────────────
+  # ─── Payment Service ──────────────────────────────────────────────
   payment-service:
     build:
-      context: ./services/payment-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: docker/backend.Dockerfile
+      args:
+        MODULE: payment-service
+        PORT: 8087
     container_name: ticket-booking-payment
     ports:
       - "8087:8087"
@@ -230,54 +271,40 @@ services:
     networks:
       - ticket-network
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ticket_booking
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ticket_booking_system_db
       - SPRING_DATASOURCE_USERNAME=ticket_user
       - SPRING_DATASOURCE_PASSWORD=root123
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
 
-  # ─── Notification Service ──────────────────────────────────────────
+  # ─── Notification Service ─────────────────────────────────────────
   notification-service:
     build:
-      context: ./services/notification-service
-      dockerfile: Dockerfile
-    container_name: ticket-booking-notify
+      context: .
+      dockerfile: docker/backend.Dockerfile
+      args:
+        MODULE: notification-service
+        PORT: 8088
+    container_name: ticket-booking-notification
     ports:
       - "8088:8088"
     depends_on:
-      - service-registry
+      service-registry:
+        condition: service_healthy
     networks:
       - ticket-network
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
 
-  # ─── Frontend ──────────────────────────────────────────────────────
+  # ─── Frontend (React, served by Nginx) ────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: ticket-booking-ui
+    container_name: ticket-booking-frontend
     ports:
       - "3000:80"
     depends_on:
       - ticket-booking
-    networks:
-      - ticket-network
-
-  # ─── Redis ─────────────────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    container_name: ticket-booking-redis
-    ports:
-      - "6379:6379"
-    networks:
-      - ticket-network
-
-  # ─── Zipkin ────────────────────────────────────────────────────────
-  zipkin:
-    image: openzipkin/zipkin:latest
-    container_name: ticket-booking-zipkin
-    ports:
-      - "9411:9411"
     networks:
       - ticket-network
 

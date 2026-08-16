@@ -1,35 +1,33 @@
 server:
-  port: 8081
+  port: ${PORT:8081}
 
 spring:
   application:
     name: auth-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/ticket_booking
-    username: ticket_user
-    password: root123
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://ep-weathered-scene-azd9bah0-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require}
+    username: ${SPRING_DATASOURCE_USERNAME:neondb_owner}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      idle-timeout: 120000
+      connection-timeout: 30000
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update
     show-sql: false
-    properties:
-      hibernate:
-        jdbc:
-          lob:
-            non_contextual_creation: true
 
 eureka:
   client:
-    serviceUrl:
-      defaultZone: http://localhost:8761/eureka/
-  instance:
-    preferIpAddress: true
+    enabled: false
+    registerWithEureka: false
+    fetchRegistry: false
 
 app:
   jwt:
-    secret: dGhpcyBpcyBhIHNlY3JldCBrZXkgZm9yIHRpY2tldCBib29raW5nIHN5c3RlbSB3aXRoIFNwcmluZyBCb290IGFuZCBKV1Q=
+    secret: ${APP_JWT_SECRET:dGhpcyBpcyBhIHNlY3JldCBrZXkgZm9yIHRpY2tldCBib29raW5nIHN5c3RlbSB3aXRoIFNwcmluZyBCb290IGFuZCBKV1Q=}
     expiration-ms: 86400000
     refresh-expiration-ms: 2592000000
 

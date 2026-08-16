@@ -14,7 +14,8 @@
     "react-router-dom": "^6.26.0",
     "axios": "^1.7.3",
     "react-hot-toast": "^2.4.1",
-    "lucide-react": "^0.441.0"
+    "lucide-react": "^0.441.0",
+    "qrcode.react": "^4.1.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

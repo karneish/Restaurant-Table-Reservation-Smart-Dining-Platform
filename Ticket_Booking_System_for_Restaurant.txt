@@ -1,0 +1,404 @@
+================================================================================
+        TICKET BOOKING SYSTEM  ->  RESTAURANT TABLE RESERVATION SYSTEM
+        (Enterprise Microservices Architecture - Full Conversion Blueprint)
+================================================================================
+
+TABLE OF CONTENTS
+  1.  Project Overview
+  2.  Domain Transformation (Movie -> Restaurant)
+  3.  New Microservices Architecture
+  4.  Smart Table Match Algorithm ("Best Table Matches")
+  5.  Live Table Hygiene / Cleaning Status System
+  6.  Pre-Ordering System (attached to reservation)
+  7.  Reservation Lifecycle & Table Locking
+  8.  Waitlist System
+  9.  Data Model (Entities & Statuses)
+  10. New REST API Endpoints
+  11. Frontend Rebuild
+  12. Infrastructure & Wiring Changes
+  13. Admin Dashboard
+  14. Unique Selling Points ("Most Unique & Best")
+  15. Default Credentials
+  16. Build & Run
+  17. Future Enhancements
+
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+The existing "Ticket Booking System" (11 Spring Boot microservices + React
+frontend, PostgreSQL, Redis, Zipkin, Docker) is converted into an
+ENTERPRISE-GRADE RESTAURANT TABLE RESERVATION PLATFORM.
+
+Instead of movies / theatres / screens / seats / tickets, the platform now
+manages:
+    RESTAURANTS -> DINING AREAS -> TABLES -> TIME SLOTS -> RESERVATIONS
+plus three signature features:
+    (a) SMART TABLE MATCHING   - best table for your party size & preferences
+    (b) LIVE TABLE HYGIENE     - is the table clean? live cleaning status board
+    (c) PRE-ORDERING           - order food while you reserve, ready when seated
+
+Multiple restaurants are supported (same multi-entity structure as the
+original multi-movie system).
+
+TECH STACK (unchanged):
+  Backend  : Java 21, Spring Boot 3.2.5, Spring Cloud Gateway, Eureka,
+             Spring Cloud Config, Spring Data JPA, PostgreSQL 16, Redis 7,
+             Resilience4j, Micrometer + Zipkin, Swagger UI
+  Frontend : React 18, TypeScript 5.5, Vite, TailwindCSS, React Router v6,
+             Axios, React Hot Toast, Lucide React
+  Deploy   : Docker Compose (15-16 containers), Maven multi-module
+
+
+================================================================================
+2. DOMAIN TRANSFORMATION (Movie -> Restaurant)
+================================================================================
+  Movie .................. Restaurant (catalog entry)
+  Movie title/poster ..... Restaurant name / cover image
+  Genre .................. Cuisine type (Italian, Indian, Chinese, ...)
+  Language filter ........ Cuisine filter
+  Movie status ........... Restaurant OPEN / CLOSED status
+  Theatre ................ Restaurant venue profile
+  Screen ................. Dining Area / Floor (Ground, Terrace, Private Lounge)
+  Seat ................... Table (capacity, floor-plan x/y, zone)
+  Seat category .......... Table Zone (WINDOW, PRIVATE, OUTDOOR, BAR, FAMILY, LOUNGE)
+  Show ................... Table Slot (table + date + service time + status)
+  Show date/time ......... Service slot (Lunch session, Dinner session, etc.)
+  Ticket price ........... Table deposit / minimum spend
+  Booking ................ Reservation
+  BookingSeat ............ ReservedTable (large parties may hold several tables)
+  Seat locking ........... Table locking (hold while paying deposit)
+  Waitlist ............... Table waitlist (auto-notify on readiness)
+  Movie search/features .. Restaurant search by name/cuisine/city/rating/features
+  Seat-selection screen .. Interactive TABLE MAP (floor plan) with live status
+
+
+================================================================================
+3. NEW MICROSERVICES ARCHITECTURE
+================================================================================
+ Backend services (renamed semantically from movie domain):
+
+  #  OLD NAME           NEW NAME                  PORT   RESPONSIBILITY
+  1  service-registry   service-registry          8761   Eureka discovery (unchanged)
+  2  config-server      config-server             8888   Central config (unchanged)
+  3  api-gateway        api-gateway               8080   Entry point / routing (unchanged)
+  4  auth-service       auth-service              8081   Auth + JWT + OTP (unchanged)
+  5  user-service       user-service              8082   User profiles (unchanged)
+  6  movie-service      -> restaurant-service     8083   Restaurants, cuisines, MENU items
+  7  theatre-service    -> table-service          8084   Dining areas, TABLES, floor plans,
+                                                            CLEANING STATUS + cleaning log
+  8  show-service       -> slot-service           8085   Table SLOTS / availability per session
+  9  booking-service    -> reservation-service    8086   RESERVATIONS, table locking,
+                                                            waitlist, PRE-ORDERS
+  10 payment-service    payment-service           8087   Deposit payment / refund (unchanged)
+  11 notification-...   notification-service      8088   Confirmations, table-ready, cleaning
+                                                            reminders, waitlist alerts (unchanged)
+
+ Shared infra: PostgreSQL 16 (ticket_booking), Redis 7, Zipkin, pgAdmin4.
+ Shared library (services/common) rebuilt with restaurant DTOs & exceptions.
+
+
+================================================================================
+4. SMART TABLE MATCH ALGORITHM ("Best Table Matches")
+================================================================================
+ Given a party size, date, time slot, restaurant and preferences, the system
+ scores every candidate table that is FREE (no active reservation on that
+ slot) and hygienically READY (see section 5).
+
+ SCORING FACTORS (higher = better match):
+   1. Capacity fit          : exact capacity match scores max; table capacity
+                              >= party size and <= party size + 2 preferred
+   2. Wasted seats          : penalty for empty seats (capacity - party size)
+   3. Zone preference       : WINDOW / PRIVATE / OUTDOOR / BAR / FAMILY /
+                              LOUNGE - matching preference boosts score
+   4. Accessibility         : wheelchair-accessible tables boosted for
+                              accessibility requests
+   5. Quiet corner          : tables flagged "quiet" boosted when requested
+   6. Cleaning readiness    : CLEAN (READY) tables always outrank tables in
+                              CLEANING (cleaning ETA used as tie-breaker)
+   7. Location convenience  : tables near entrance / restroom per preference
+   8. Multi-table grouping  : for very large parties, adjacent tables are
+                              combined into one match (ReservedTable group)
+
+ OUTPUT: ranked list of "best matches" with a MATCH SCORE (%) and human
+ readable reasons, e.g.:
+   "Table 7 - Window zone, seats 4 - 100% match (perfect size)"
+   "Table 12 - Outdoor, seats 6 - 82% match (2 seats wasted, being cleaned,
+    ready in ~10 min)"
+
+ ENDPOINT:  GET /api/tables/match?restaurantId&date&time&partySize
+            &zone&accessible&quiet
+
+
+================================================================================
+5. LIVE TABLE HYGIENE / CLEANING STATUS SYSTEM
+================================================================================
+ Every table carries a live cleaning state machine:
+
+    READY  ->  RESERVED  ->  OCCUPIED  ->  DIRTY  ->  CLEANING  ->  READY
+    (clean)  (on hold)    (seated)    (needs  (staff   )       (available)
+                                        cleaning) sanitizing)
+
+ RULES & AUTOMATION
+   * A reservation HOLD locks a table as RESERVED.
+   * When guests are seated (staff marks OCCUPIED), a PRE-ORDER placed by the
+     guest is automatically released to the kitchen.
+   * When guests leave, staff marks the table DIRTY (auto-suggested).
+   * Staff starts cleaning -> status CLEANING with an estimated finish time
+     (cleaningDurationMinutes + startedAt).
+   * Cleaning completes -> status READY, and a cleaning LOG entry is stored
+     (timestamp, staff, action).
+   * WAITLIST users waiting for a table of that size are automatically
+     notified the moment a matching table becomes READY.
+
+ CUSTOMER VISIBILITY (on the table map):
+   GREEN  = READY (book it now)
+   BLUE   = RESERVED (held for another party)
+   RED    = OCCUPIED (in use)
+   BROWN  = DIRTY (cleaning needed)
+   AMBER  = CLEANING - "being cleaned, ready in ~10 min"
+   PURPLE = your selected table
+
+ STAFF ENDPOINTS:
+   PUT /api/tables/{id}/cleaning   {status: OCCUPIED|DIRTY|CLEANING|READY}
+   GET  /api/tables/{id}/cleaning-log
+
+
+================================================================================
+6. PRE-ORDERING SYSTEM (attached to reservation)
+================================================================================
+ MENU (owned by restaurant-service)
+   MenuItem: name, category (STARTERS/MAINS/DESSERTS/DRINKS), price,
+   dietary tags (VEG / NON_VEG / VEGAN / GLUTEN_FREE / JAIN), spice level,
+   prepTimeMinutes, availability, restaurantId.
+
+ PRE-ORDER FLOW
+   1. While reserving, the customer builds a pre-order from the menu.
+   2. Pre-order total is shown inside the reservation summary and added to
+      the required deposit (or shown separately).
+   3. On seat-in (staff marks OCCUPIED), the pre-order status flips
+      DRAFT -> PLACED and the kitchen receives it.
+   4. Kitchen/waiter updates: PLACED -> IN_PREP -> SERVED.
+   5. Estimated serve time is displayed to the guest.
+
+ PRE-ORDER LIFECYCLE: DRAFT -> PLACED -> IN_PREP -> SERVED (or CANCELLED)
+
+
+================================================================================
+7. RESERVATION LIFECYCLE & TABLE LOCKING
+================================================================================
+  1. Customer searches restaurants -> opens detail -> picks date + service time.
+  2. System shows the interactive TABLE MAP with live cleaning status +
+     SMART MATCH suggestions.
+  3. Customer selects 1+ tables (multi-table for large parties) + optional
+     pre-order items.
+  4. createReservation -> tables are LOCKED (RESERVED status) with a 15-minute
+     payment hold; reservation status = HOLD.
+  5. confirmReservation -> customer pays DEPOSIT via payment-service;
+     status = CONFIRMED; a confirmation code + notification is issued.
+  6. Seated (staff) -> OCCUPIED + pre-order released to kitchen.
+  7. Completed -> status COMPLETED; tables auto-marked DIRTY -> cleaning flow.
+  8. Cancellation -> status CANCELLED; deposit refunded; tables released to
+     READY; waitlist checked for instant reassignment.
+
+ STATUSES: HOLD -> CONFIRMED -> SEATED -> COMPLETED / CANCELLED
+
+
+================================================================================
+8. WAITLIST SYSTEM
+================================================================================
+ If no table matches (or all matching tables are OCCUPIED/DIRTY), the
+ customer can join a TABLE WAITLIST with party size + preferred time window.
+ When any matching table becomes READY, the reservation service triggers a
+ notification (and holds the table for the first waiting customer for a
+ short grace period).
+ Auto-cleanup removes expired waitlist entries.
+
+
+================================================================================
+9. DATA MODEL (Entities & Statuses)
+================================================================================
+ restaurant-service
+   Restaurant        : id, name, cuisine, city, address, rating, avgCostPerHead,
+                       openHours, imageUrl, description, features, status(OPEN/CLOSED)
+   MenuItem          : id, restaurantId, name, category, price, dietaryTags,
+                       spiceLevel, prepTimeMinutes, available, description
+
+ table-service
+   DiningArea        : id, restaurantId, name(Floor/Terrace/Lounge), description
+   RestaurantTable   : id, areaId, restaurantId, tableNumber, capacity,
+                       zone(WINDOW/PRIVATE/OUTDOOR/BAR/FAMILY/LOUNGE), x, y,
+                       wheelchairAccessible, quietCorner, cleaningStatus,
+                       cleaningStartedAt, cleaningEtaMinutes, version
+   CleaningLog       : id, tableId, action, staffEmail, timestamp, note
+
+ slot-service
+   TableSlot         : id, tableId, restaurantId, slotDate, startTime, endTime,
+                       sessionName(LUNCH/DINNER), status(AVAILABLE/HOLD/CONFIRMED/
+                       OCCUPIED/CLOSED), version   <- optimistic locking
+
+ reservation-service
+   Reservation       : id, reservationId, confirmationCode, restaurantId,
+                       areaId, slotId, partySize, depositAmount, status
+                       (HOLD/CONFIRMED/SEATED/COMPLETED/CANCELLED), userEmail
+   ReservedTable     : id, reservationId, tableId, tableNumber, zone
+   PreOrder          : id, reservationId, status(DRAFT/PLACED/IN_PREP/SERVED/
+                       CANCELLED), totalAmount
+   PreOrderItem      : id, preOrderId, menuItemId, name, unitPrice, quantity
+   TableWaitlistEntry: id, restaurantId, slotId, userEmail, partySize,
+                       preferredWindow, status(WAITING/OFFERED/EXPIRED/COMPLETED)
+
+ common (shared DTOs): RestaurantDTO, MenuItemDTO, DiningAreaDTO, TableDTO,
+   TableSlotDTO, ReservationDTO, ReservedTableDTO, PreOrderDTO,
+   PreOrderItemDTO, CleaningStatusDTO, MatchResultDTO (+ existing
+   Auth/User/Payment DTOs)
+
+
+================================================================================
+10. NEW REST API ENDPOINTS (proxied via gateway :8080)
+================================================================================
+ RESTAURANTS - /api/restaurants
+   GET  /api/restaurants                   list all
+   GET  /api/restaurants/active            open only
+   GET  /api/restaurants/search?q=         by name/cuisine
+   GET  /api/restaurants/cuisine/{c}       filter by cuisine
+   GET  /api/restaurants/city/{city}       filter by city
+   GET  /api/restaurants/{id}              details
+   GET  /api/restaurants/{id}/menu         menu items
+   POST/PUT/DELETE /api/restaurants        admin CRUD
+
+ DINING AREAS & TABLES - /api/areas, /api/tables
+   GET  /api/restaurants/{id}/areas                areas of a restaurant
+   GET  /api/areas/{areaId}/tables                 table map for an area
+   GET  /api/tables/{id}                           table detail + status
+   GET  /api/tables/match?restaurantId&date&time&partySize&zone&accessible&quiet
+                                                    SMART MATCHES (ranked)
+   PUT  /api/tables/{id}/cleaning                  staff update cleaning status
+   GET  /api/tables/{id}/cleaning-log              cleaning history
+
+ SLOTS - /api/slots
+   GET  /api/slots/availability?restaurantId&date&time&partySize
+                                                     available tables + matches
+   POST /api/slots (admin) / PUT /api/slots/{id} (admin)
+
+ RESERVATIONS - /api/reservations
+   POST /api/reservations                           create (HOLD + lock tables)
+   POST /api/reservations/{id}/pay                  pay deposit -> CONFIRMED
+   POST /api/reservations/{id}/cancel               cancel + refund + release
+   GET  /api/reservations/{id}                      by reservationId
+   GET  /api/reservations/user                      current user's reservations
+   PUT  /api/reservations/{id}/status               staff: SEATED / COMPLETED
+   POST /api/reservations/{id}/preorder             submit pre-order (DRAFT->PLACED)
+   PUT  /api/preorders/{id}/status                  kitchen: IN_PREP / SERVED
+   POST /api/reservations/waitlist                  join table waitlist
+
+ PAYMENTS / NOTIFICATIONS - unchanged (/api/payments, /api/notifications)
+
+ AUTH / USERS - unchanged (/api/auth, /api/users)
+
+
+================================================================================
+11. FRONTEND REBUILD (React + TypeScript + Vite)
+================================================================================
+ ROUTES:
+   /                    HomePage       -> featured restaurants + search
+   /login, /register    (unchanged)
+   /restaurants         RestaurantsPage-> list + cuisine/city filter + search
+   /restaurants/:id     RestaurantDetailPage -> info, menu, live availability,
+                                             "Reserve a Table" CTA
+   /reserve/:restaurantId  TableSelectionPage -> date/time slot picker, SMART
+                                             MATCH list, interactive TABLE MAP
+                                             with cleaning-status colors,
+                                             multi-table select + pre-order
+   /reservations/:id    ReservationDetailPage -> confirmation code, deposit
+                                             summary, pre-order status, cleaning
+                                             ETA of their table
+   /my-reservations     MyReservationsPage -> history, cancel, waitlist status
+   /admin               AdminDashboard -> restaurants, areas/tables floor-plan
+                                             editor, menu editor, slots, LIVE
+                                             CLEANING BOARD, reservations board
+
+ NEW COMPONENTS:
+   TableMap.tsx            visual floor plan; color-coded by cleaning status
+   SmartMatchCard.tsx      ranked "best table matches" with score + reasons
+   MenuPreOrderBuilder.tsx category tabs + dietary filter + qty steppers
+   CleaningBadge.tsx       READY/RESERVED/OCCUPIED/DIRTY/CLEANING pills
+   AreaTabs.tsx            dining-area switcher
+
+ TYPES (src/types): Restaurant, MenuItem, DiningArea, RestaurantTable,
+   TableSlot, Reservation, PreOrder, PreOrderItem, CleaningStatus, MatchResult
+ API CLIENT (src/services/api.ts): restaurantAPI, areaTableAPI, slotAPI,
+   reservationAPI, preorderAPI replace movieAPI/theatreAPI/showAPI/bookingAPI
+
+
+================================================================================
+12. INFRASTRUCTURE & WIRING CHANGES
+================================================================================
+   * services/pom.xml      -> modules renamed to restaurant-service, table-
+                             service, slot-service, reservation-service
+   * config-repo/api-gateway.yml -> routes /api/restaurants, /api/areas,
+                             /api/tables, /api/slots, /api/reservations,
+                             /api/preorders (replacing movie/theatre/show/booking)
+   * docker-compose.yml    -> service + container names:
+                             ticket-booking-resto, -tables, -slots, -reserve
+   * Data seeders          -> sample restaurants (Italian/Indian/Chinese),
+                             dining areas, 8-12 tables each with floor-plan
+                             coords + random cleaning states, menus with
+                             dietary tags, lunch/dinner slots
+   * scripts/build-all.ps1 & run-all.ps1 -> updated module list
+   * README.md             -> rewritten for the restaurant domain
+
+
+================================================================================
+13. ADMIN DASHBOARD
+================================================================================
+ Tabs: Restaurants | Floor Plans | Menu | Slots | Live Cleaning Board | Bookings
+   * Restaurants : CRUD + open/close toggle
+   * Floor Plans : add dining areas + place tables on an x/y grid, set capacity/
+                   zone/accessibility, table hygiene settings
+   * Menu        : CRUD menu items, categories, dietary tags, prep times
+   * Slots       : define lunch/dinner sessions and availability
+   * LIVE CLEANING BOARD : every table as a colored tile (READY/RESERVED/
+                   OCCUPIED/DIRTY/CLEANING) with one-click status transitions
+                   and cleaning ETA countdown
+   * Bookings    : view/manage reservations, seat-in, complete, cancel
+
+
+================================================================================
+14. UNIQUE SELLING POINTS ("Most Unique & Best")
+================================================================================
+  1. SMART TABLE MATCHING with match-score % + plain-language reasons
+  2. LIVE TABLE HYGIENE BOARD - customers see exactly which tables are clean,
+     being cleaned (with ETA), dirty, or occupied
+  3. PRE-ORDERING that releases to the kitchen the moment guests sit down
+  4. Multi-table grouping for large parties
+  5. Table locking with 15-min deposit hold + waitlist auto-reassignment
+  6. Optimistic locking on slots/tables prevents double bookings
+  7. Enterprise grade: circuit breakers, rate limiting, Redis, Zipkin tracing
+
+
+================================================================================
+15. DEFAULT CREDENTIALS (kept from original)
+   Admin    : admin@ticketbooking.com / admin123
+   Customer : john@example.com        / pass123
+   DB       : ticket_user / root123 / ticket_booking   (port 5432)
+   pgAdmin  : admin@ticketbooking.com / root123        (port 5050)
+
+
+================================================================================
+16. BUILD & RUN
+   cd services && mvn clean package -DskipTests -T 4
+   cd .. && docker compose up --build -d
+   Frontend : http://localhost:3000   Gateway : http://localhost:8080
+   Eureka   : http://localhost:8761   Zipkin  : http://localhost:9411
+   (or dev: mvn spring-boot:run per service + cd frontend && npm run dev)
+
+
+================================================================================
+17. FUTURE ENHANCEMENTS
+   * Online ordering for pickup/delivery (separate from in-house pre-order)
+   * QR code at table -> view pre-order status, reorder, call waiter
+   * AI-driven table recommendation using visit history & occasion
+   * Staff shift management & cleaning task assignment
+   * Waitlist SMS/WhatsApp alerts; loyalty points; live kitchen dashboard
+================================================================================

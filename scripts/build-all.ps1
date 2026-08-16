@@ -1,42 +1,36 @@
-Write-Host "=== Building All Services ===" -ForegroundColor Cyan
+$ErrorActionPreference = "Stop"
+$Root = Split-Path $PSScriptRoot -Parent
 
-$services = @(
-  "common",
-  "service-registry",
-  "config-server",
-  "api-gateway",
-  "auth-service",
-  "user-service",
-  "movie-service",
-  "theatre-service",
-  "show-service",
-  "booking-service",
-  "payment-service",
-  "notification-service"
-)
+# Locate Maven (fall back to PATH if MAVEN_HOME is not set)
+if ($env:MAVEN_HOME -and (Test-Path "$env:MAVEN_HOME\bin\mvn.cmd")) {
+    $mvn = "$env:MAVEN_HOME\bin\mvn.cmd"
+} elseif (Get-Command mvn -ErrorAction SilentlyContinue) {
+    $mvn = (Get-Command mvn).Source
+} else {
+    Write-Host "Maven not found. Install Maven 3.9+ or set MAVEN_HOME." -ForegroundColor Red
+    exit 1
+}
+Write-Host "Using Maven: $mvn" -ForegroundColor Cyan
 
-foreach ($svc in $services) {
-  Write-Host "`nBuilding $svc..." -ForegroundColor Yellow
-  $path = Join-Path "services" $svc
-  Push-Location $path
-  & "C:\Users\ManaGenz\.m2\wrapper\dists\maven-wrapper\3.2.0\mvnw.cmd" clean package -DskipTests -q
-  if ($LASTEXITCODE -eq 0) {
-    Write-Host "$svc built successfully" -ForegroundColor Green
-  } else {
-    Write-Host "$svc build FAILED" -ForegroundColor Red
-  }
-  Pop-Location
+Write-Host "=== Building Backend Services ===" -ForegroundColor Cyan
+Push-Location (Join-Path $Root "services")
+& $mvn clean install -DskipTests
+$code = $LASTEXITCODE
+Pop-Location
+if ($code -ne 0) {
+    Write-Host "Backend build FAILED" -ForegroundColor Red
+    exit 1
 }
 
 Write-Host "`n=== Building Frontend ===" -ForegroundColor Cyan
-Push-Location "frontend"
+Push-Location (Join-Path $Root "frontend")
 npm install --silent
 npm run build
-if ($LASTEXITCODE -eq 0) {
-  Write-Host "Frontend built successfully" -ForegroundColor Green
-} else {
-  Write-Host "Frontend build FAILED" -ForegroundColor Red
-}
+$code = $LASTEXITCODE
 Pop-Location
+if ($code -ne 0) {
+    Write-Host "Frontend build FAILED" -ForegroundColor Red
+    exit 1
+}
 
-Write-Host "`n=== Build Complete ===" -ForegroundColor Cyan
+Write-Host "`n=== Build Complete ===" -ForegroundColor Green

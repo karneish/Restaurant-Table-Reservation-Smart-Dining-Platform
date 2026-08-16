@@ -5,7 +5,7 @@
             "Group": "Servers",
             "Host": "postgres",
             "Port": 5432,
-            "MaintenanceDB": "ticket_booking",
+            "MaintenanceDB": "ticket_booking_system_db",
             "Username": "ticket_user",
             "Password": "root123",
             "SSLMode": "prefer",

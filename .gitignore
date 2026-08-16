@@ -40,5 +40,5 @@ services/common/target/
 frontend/node_modules/
 frontend/dist/
 
-# Docker
-docker-compose.override.yml
+# TypeScript incremental build cache
+*.tsbuildinfo

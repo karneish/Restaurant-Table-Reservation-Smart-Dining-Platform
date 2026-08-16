@@ -11,6 +11,14 @@ public class IdGenerator {
         return "BOK" + generateTimestampPart() + generateRandomPart();
     }
 
+    public static String generateReservationId() {
+        return "RSV" + generateTimestampPart() + generateRandomPart();
+    }
+
+    public static String generateConfirmationCode() {
+        return "CNF" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+
     public static String generateTicketNumber() {
         return "TKT" + generateTimestampPart() + generateRandomPart();
     }

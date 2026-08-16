@@ -1,0 +1,8 @@
+.git
+**/target
+**/node_modules
+services/data
+frontend/dist
+*.log
+.dockerignore
+README.md

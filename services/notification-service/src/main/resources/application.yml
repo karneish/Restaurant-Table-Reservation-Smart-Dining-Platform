@@ -1,27 +1,27 @@
 server:
-  port: 8088
+  port: ${PORT:8088}
 spring:
   application:
     name: notification-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/ticket_booking
-    username: ticket_user
-    password: root123
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://ep-weathered-scene-azd9bah0-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require}
+    username: ${SPRING_DATASOURCE_USERNAME:neondb_owner}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      idle-timeout: 120000
+      connection-timeout: 30000
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update
-    properties:
-      hibernate:
-        jdbc:
-          lob:
-            non_contextual_creation: true
+    show-sql: false
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: your-email@gmail.com
-    password: your-app-password
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:your-email@gmail.com}
+    password: ${MAIL_PASSWORD:your-app-password}
     properties:
       mail:
         smtp:
@@ -30,7 +30,6 @@ spring:
             enable: true
 eureka:
   client:
-    serviceUrl:
-      defaultZone: http://localhost:8761/eureka/
-  instance:
-    preferIpAddress: true
+    enabled: false
+    registerWithEureka: false
+    fetchRegistry: false

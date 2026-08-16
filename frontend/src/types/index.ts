@@ -7,76 +7,97 @@ export interface User {
   role: string;
 }
 
-export interface Movie {
-  id: number;
-  title: string;
-  language: string;
-  genre: string;
-  duration: number;
-  rating: number;
-  releaseDate: string;
-  description?: string;
-  posterUrl?: string;
-  active: boolean;
-}
-
-export interface Theatre {
+export interface Restaurant {
   id: number;
   name: string;
-  address: string;
+  cuisine: string;
   city: string;
+  address: string;
+  rating: number;
+  avgCostPerHead: number;
+  openHours: string;
+  imageUrl?: string;
+  description?: string;
+  features?: string;
   active: boolean;
-  screens?: Screen[];
 }
 
-export interface Screen {
+export interface DiningArea {
   id: number;
-  screenNumber: number;
-  totalSeats: number;
-  theatreId: number;
+  restaurantId: number;
+  name: string;
+  description?: string;
 }
 
-export interface Show {
+export interface RestaurantTable {
   id: number;
-  showDate: string;
-  showTime: string;
-  ticketPrice: number;
-  availableSeats: number;
+  areaId: number;
+  restaurantId: number;
+  tableNumber: string;
+  capacity: number;
+  zone: string;
+  x: number;
+  y: number;
+  wheelchairAccessible: boolean;
+  quietCorner: boolean;
+  cleaningStatus: string;
+  cleaningStartedAt?: string;
+  cleaningEtaMinutes?: number;
+}
+
+export interface TableSlot {
+  id: number;
+  tableId: number;
+  restaurantId: number;
+  slotDate: string;
+  startTime: string;
+  endTime: string;
+  sessionName: string;
   status: string;
-  movieId: number;
-  movieTitle?: string;
-  screenId: number;
-  screenNumber?: number;
-  theatreId: number;
-  theatreName?: string;
-  theatreCity?: string;
+  tableCapacity: number;
+  tableNumber: string;
+  zone: string;
+  cleaningStatus: string;
 }
 
-export interface Seat {
+export interface MenuItem {
   id: number;
-  seatNumber: string;
-  seatRow: string;
+  restaurantId: number;
+  name: string;
   category: string;
-  status: string;
-  screenId: number;
+  price: number;
+  dietaryTags?: string;
+  spiceLevel?: number;
+  prepTimeMinutes?: number;
+  available: boolean;
+  description?: string;
 }
 
-export interface Booking {
+export interface MatchResult {
+  table: RestaurantTable;
+  score: number;
+  reason: string;
+  grouped: boolean;
+  group?: RestaurantTable[];
+  totalCapacity: number;
+}
+
+export interface PreOrderItem {
   id: number;
-  bookingId: string;
-  ticketNumber: string;
-  totalAmount: number;
+  menuItemId: number;
+  name: string;
+  unitPrice: number;
+  quantity: number;
+  category: string;
+  dietaryTags?: string;
+}
+
+export interface PreOrder {
+  id: number;
+  reservationId: string;
   status: string;
-  userName?: string;
-  userEmail: string;
-  movieTitle?: string;
-  theatreName?: string;
-  screenNumber?: number;
-  showDate?: string;
-  showTime?: string;
-  seats: Seat[];
-  payment?: Payment;
-  createdAt: string;
+  totalAmount: number;
+  items: PreOrderItem[];
 }
 
 export interface Payment {
@@ -86,6 +107,89 @@ export interface Payment {
   paymentMethod: string;
   status: string;
   bookingId: number;
+  createdAt: string;
+}
+
+export interface Reservation {
+  id: number;
+  reservationId: string;
+  confirmationCode: string;
+  restaurantId: number;
+  restaurantName: string;
+  restaurantCity: string;
+  areaId: number;
+  areaName: string;
+  reservationDateTime: string;
+  partySize: number;
+  depositAmount: number;
+  status: string;
+  userEmail: string;
+  occasion?: string;
+  celebrationNotes?: string;
+  waiterCalled?: boolean;
+  billRequested?: boolean;
+  addOns?: OccasionAddOn[];
+  tables: RestaurantTable[];
+  preOrder?: PreOrder;
+  payment?: Payment;
+  createdAt: string;
+}
+
+export interface OccasionAddOn {
+  id: number;
+  name: string;
+  description?: string;
+  price: number;
+  emoji?: string;
+  applicableOccasions?: string;
+  active?: boolean;
+}
+
+export interface CompanionSummary {
+  reservationId: string;
+  confirmationCode: string;
+  restaurantName: string;
+  restaurantCity: string;
+  reservationDateTime: string;
+  status: string;
+  partySize: number;
+  occasion?: string;
+  celebrationNotes?: string;
+  tables: RestaurantTable[];
+  addOns?: OccasionAddOn[];
+  preOrder?: PreOrder;
+  waiterCalled?: boolean;
+  billRequested?: boolean;
+}
+
+export interface AppNotification {
+  id: number;
+  userEmail: string;
+  type: string;
+  title: string;
+  body: string;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface ProfileData {
+  id?: number;
+  name: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  dateOfBirth?: string;
+  role?: string;
+}
+
+export interface WaitlistEntry {
+  id: number;
+  restaurantId: number;
+  slotId: number;
+  userEmail: string;
+  partySize: number;
+  preferredWindow: string;
+  status: string;
   createdAt: string;
 }
 
@@ -104,5 +208,6 @@ export interface AuthResponse {
   name: string;
   email: string;
   role: string;
+  emailVerified: boolean;
   message: string;
 }

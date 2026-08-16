@@ -24,10 +24,10 @@
         <module>api-gateway</module>
         <module>auth-service</module>
         <module>user-service</module>
-        <module>movie-service</module>
-        <module>theatre-service</module>
-        <module>show-service</module>
-        <module>booking-service</module>
+        <module>restaurant-service</module>
+        <module>table-service</module>
+        <module>slot-service</module>
+        <module>reservation-service</module>
         <module>payment-service</module>
         <module>notification-service</module>
     </modules>

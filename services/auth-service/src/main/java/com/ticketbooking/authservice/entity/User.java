@@ -35,6 +35,9 @@ public class User {
     private Boolean emailVerified = false;
 
     private String otp;
+    private String otpHash;
+    private LocalDateTime otpExpiresAt;
+    private LocalDateTime lastOtpSentAt;
 
     @Column(updatable = false)
     private LocalDateTime createdAt;

@@ -18,10 +18,10 @@
         <module>services/api-gateway</module>
         <module>services/auth-service</module>
         <module>services/user-service</module>
-        <module>services/movie-service</module>
-        <module>services/theatre-service</module>
-        <module>services/show-service</module>
-        <module>services/booking-service</module>
+        <module>services/restaurant-service</module>
+        <module>services/table-service</module>
+        <module>services/slot-service</module>
+        <module>services/reservation-service</module>
         <module>services/payment-service</module>
         <module>services/notification-service</module>
     </modules>

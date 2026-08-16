@@ -1,28 +1,26 @@
 server:
-  port: 8082
+  port: ${PORT:8082}
 spring:
   application:
     name: user-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/ticket_booking
-    username: ticket_user
-    password: root123
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://ep-weathered-scene-azd9bah0-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require}
+    username: ${SPRING_DATASOURCE_USERNAME:neondb_owner}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      idle-timeout: 120000
+      connection-timeout: 30000
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update
-    properties:
-      hibernate:
-        jdbc:
-          lob:
-            non_contextual_creation: true
 eureka:
   client:
-    serviceUrl:
-      defaultZone: http://localhost:8761/eureka/
-  instance:
-    preferIpAddress: true
+    enabled: false
+    registerWithEureka: false
+    fetchRegistry: false
 management:
   endpoints:
     web:

@@ -1,9 +1,15 @@
 import axios from 'axios';
-import type { APIResponse, AuthResponse, Movie, Theatre, Show, Seat, Booking } from '../types';
+import type {
+  APIResponse, Restaurant, DiningArea, RestaurantTable,
+  TableSlot, MenuItem, MatchResult, Reservation, WaitlistEntry, AuthResponse,
+  OccasionAddOn, CompanionSummary, AppNotification, ProfileData,
+} from '../types';
+import { GUEST_EMAIL } from '../context/AuthContext';
 
 const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
+  timeout: 30000,
 });
 
 api.interceptors.request.use((config) => {
@@ -11,67 +17,172 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  const email = localStorage.getItem('userEmail');
-  if (email) {
-    config.headers['X-User-Email'] = email;
-  }
+  config.headers['X-User-Email'] = localStorage.getItem('userEmail') ?? GUEST_EMAIL;
   return config;
 });
 
+let refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefresh(): Promise<boolean> {
+  const rt = localStorage.getItem('refreshToken');
+  if (!rt) return false;
+  try {
+    const res = await axios.post<APIResponse<AuthResponse>>('/api/auth/refresh', { refreshToken: rt });
+    const data = res.data.data;
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('refreshToken', data.refreshToken);
+    localStorage.setItem('userEmail', data.email);
+    localStorage.setItem('userName', data.name);
+    localStorage.setItem('userRole', data.role);
+    localStorage.setItem('userId', String(data.userId));
+    return true;
+  } catch {
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userId');
+    return false;
+  }
+}
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('userEmail');
-      window.location.href = '/login';
+  async (error) => {
+    const original = error.config;
+    if (error.response?.status !== 401 || original?._retry || original?.url?.includes('/auth/')) {
+      return Promise.reject(error);
+    }
+    original._retry = true;
+    refreshPromise = refreshPromise ?? tryRefresh();
+    const ok = await refreshPromise;
+    refreshPromise = null;
+    if (ok) {
+      original.headers.Authorization = `Bearer ${localStorage.getItem('token')}`;
+      return api(original);
     }
     return Promise.reject(error);
-  }
+  },
 );
 
+/** Pull a human-readable message out of an API error. */
+export function errorMessage(err: unknown, fallback = 'Something went wrong'): string {
+  if (axios.isAxiosError(err)) {
+    const data = err.response?.data as { message?: string } | undefined;
+    return data?.message || err.message || fallback;
+  }
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
+
 export const authAPI = {
-  login: (email: string, password: string) =>
-    api.post<APIResponse<AuthResponse>>('/auth/login', { email, password }),
-  register: (data: { name: string; email: string; password: string; phone?: string }) =>
+  register: (data: { name: string; email: string; password: string; phone?: string; address?: string }) =>
     api.post<APIResponse<AuthResponse>>('/auth/register', data),
+  login: (data: { email: string; password: string }) =>
+    api.post<APIResponse<AuthResponse>>('/auth/login', data),
+  refresh: (refreshToken: string) =>
+    api.post<APIResponse<AuthResponse>>('/auth/refresh', { refreshToken }),
+  sendOtp: (email: string) =>
+    api.post<APIResponse<void>>('/auth/send-otp', { email }),
+  verifyOtp: (email: string, otp: string) =>
+    api.post<APIResponse<boolean>>('/auth/verify-otp', { email, otp }),
 };
 
-export const movieAPI = {
-  getAll: () => api.get<APIResponse<Movie[]>>('/movies'),
-  getActive: () => api.get<APIResponse<Movie[]>>('/movies/active'),
-  getById: (id: number) => api.get<APIResponse<Movie>>(`/movies/${id}`),
-  search: (q: string) => api.get<APIResponse<Movie[]>>(`/movies/search?q=${q}`),
-  getByLanguage: (lang: string) => api.get<APIResponse<Movie[]>>(`/movies/language/${lang}`),
+export const restaurantAPI = {
+  getAll: () => api.get<APIResponse<Restaurant[]>>('/restaurants'),
+  getActive: () => api.get<APIResponse<Restaurant[]>>('/restaurants/active'),
+  getById: (id: number) => api.get<APIResponse<Restaurant>>(`/restaurants/${id}`),
+  search: (q: string) => api.get<APIResponse<Restaurant[]>>(`/restaurants/search?q=${q}`),
+  getByCuisine: (cuisine: string) => api.get<APIResponse<Restaurant[]>>(`/restaurants/cuisine/${cuisine}`),
+  getByCity: (city: string) => api.get<APIResponse<Restaurant[]>>(`/restaurants/city/${city}`),
+  getMenu: (id: number) => api.get<APIResponse<MenuItem[]>>(`/restaurants/${id}/menu`),
+  create: (data: Record<string, unknown>) => api.post<APIResponse<Restaurant>>('/restaurants', data),
+  update: (id: number, data: Record<string, unknown>) => api.put<APIResponse<Restaurant>>(`/restaurants/${id}`, data),
+  remove: (id: number) => api.delete<APIResponse<void>>(`/restaurants/${id}`),
+  addMenuItem: (id: number, data: Record<string, unknown>) =>
+    api.post<APIResponse<MenuItem>>(`/restaurants/${id}/menu`, data),
+  updateMenuItem: (id: number, itemId: number, data: Record<string, unknown>) =>
+    api.put<APIResponse<MenuItem>>(`/restaurants/${id}/menu/${itemId}`, data),
+  deleteMenuItem: (id: number, itemId: number) =>
+    api.delete<APIResponse<void>>(`/restaurants/${id}/menu/${itemId}`),
 };
 
-export const theatreAPI = {
-  getAll: () => api.get<APIResponse<Theatre[]>>('/theatres'),
-  getActive: () => api.get<APIResponse<Theatre[]>>('/theatres/active'),
-  getByCity: (city: string) => api.get<APIResponse<Theatre[]>>(`/theatres/city/${city}`),
-  getById: (id: number) => api.get<APIResponse<Theatre>>(`/theatres/${id}`),
-  getSeats: (screenId: number) => api.get<APIResponse<Seat[]>>(`/theatres/screens/${screenId}/seats`),
+export const tableAPI = {
+  getAreas: (restaurantId: number) => api.get<APIResponse<DiningArea[]>>(`/restaurants/${restaurantId}/areas`),
+  createArea: (restaurantId: number, data: { name: string; description?: string }) =>
+    api.post<APIResponse<DiningArea>>(`/restaurants/${restaurantId}/areas`, data),
+  getTablesByArea: (areaId: number) => api.get<APIResponse<RestaurantTable[]>>(`/areas/${areaId}/tables`),
+  createTable: (areaId: number, data: Record<string, unknown>) =>
+    api.post<APIResponse<RestaurantTable>>(`/areas/${areaId}/tables`, data),
+  getById: (id: number) => api.get<APIResponse<RestaurantTable>>(`/tables/${id}`),
+  findMatches: (params: { restaurantId: number; partySize: number; zone?: string; accessible?: boolean; quiet?: boolean; occasion?: string }) =>
+    api.get<APIResponse<MatchResult[]>>('/tables/match', { params }),
+  updateCleaning: (id: number, data: { cleaningStatus: string }) =>
+    api.put<APIResponse<RestaurantTable>>(`/tables/${id}/cleaning`, data),
 };
 
-export const showAPI = {
-  search: (params: { movieId?: number; theatreId?: number; date: string }) =>
-    api.get<APIResponse<Show[]>>('/shows/search', { params }),
-  getByMovie: (movieId: number) => api.get<APIResponse<Show[]>>(`/shows/movie/${movieId}`),
+export const slotAPI = {
+  getAll: () => api.get<APIResponse<TableSlot[]>>('/slots'),
+  getAvailable: (params: { restaurantId: number; date: string; partySize?: number }) =>
+    api.get<APIResponse<TableSlot[]>>('/slots/availability', { params }),
+  getByRestaurantDate: (restaurantId: number, date: string) =>
+    api.get<APIResponse<TableSlot[]>>(`/slots/restaurant/${restaurantId}/date`, { params: { date } }),
+  create: (data: Record<string, unknown>) => api.post<APIResponse<TableSlot>>('/slots', data),
+  close: (id: number) => api.delete<APIResponse<void>>(`/slots/${id}`),
 };
 
-export const bookingAPI = {
-  create: (showId: number, seatIds: number[]) =>
-    api.post<APIResponse<Booking>>('/bookings', { showId, seatIds }),
-  confirm: (bookingId: string, paymentMethod: string) =>
-    api.post<APIResponse<Booking>>(`/bookings/${bookingId}/pay`, { paymentMethod }),
-  cancel: (bookingId: string) =>
-    api.post<APIResponse<Booking>>(`/bookings/${bookingId}/cancel`),
-  getByBookingId: (bookingId: string) =>
-    api.get<APIResponse<Booking>>(`/bookings/bookingId/${bookingId}`),
-  getByTicket: (ticketNumber: string) =>
-    api.get<APIResponse<Booking>>(`/bookings/ticket/${ticketNumber}`),
-  joinWaitlist: (showId: number, seats: number) =>
-    api.post('/bookings/waitlist', { showId, seats }),
+export const reservationAPI = {
+  create: (data: {
+    restaurantId: number;
+    areaId: number;
+    slotId: number;
+    partySize: number;
+    tableIds: number[];
+    preOrderItems?: { menuItemId: number; quantity: number }[];
+    occasion?: string;
+    celebrationNotes?: string;
+    addOns?: { addOnId: number; quantity: number }[];
+  }) => api.post<APIResponse<Reservation>>('/reservations', data),
+  confirm: (reservationId: string, paymentMethod = 'CARD') =>
+    api.post<APIResponse<Reservation>>(`/reservations/${reservationId}/pay`, { paymentMethod }),
+  cancel: (reservationId: string) =>
+    api.post<APIResponse<Reservation>>(`/reservations/${reservationId}/cancel`),
+  getByReservationId: (reservationId: string) =>
+    api.get<APIResponse<Reservation>>(`/reservations/reservation/${reservationId}`),
+  getByUser: () => api.get<APIResponse<Reservation[]>>('/reservations/user'),
+  getAll: () => api.get<APIResponse<Reservation[]>>('/reservations'),
+  updateStatus: (reservationId: string, status: string) =>
+    api.put<APIResponse<Reservation>>(`/reservations/${reservationId}/status`, { status }),
+  submitPreOrder: (reservationId: string) =>
+    api.post<APIResponse<Reservation>>(`/reservations/${reservationId}/preorder`),
+  updatePreOrderStatus: (preOrderId: number, status: string) =>
+    api.put<APIResponse<Reservation>>(`/reservations/preorders/${preOrderId}/status`, { status }),
+  joinWaitlist: (data: { restaurantId: number; slotId?: number; partySize: number; preferredWindow?: string }) =>
+    api.post<APIResponse<WaitlistEntry>>('/reservations/waitlist', data),
+  getWaitlistByUser: () => api.get<APIResponse<WaitlistEntry[]>>('/reservations/waitlist/user'),
+  getAddOns: (occasion?: string) =>
+    api.get<APIResponse<OccasionAddOn[]>>('/reservations/add-ons', { params: occasion ? { occasion } : {} }),
+  companion: {
+    get: (reservationId: string) =>
+      api.get<APIResponse<CompanionSummary>>(`/reservations/companion/${reservationId}`),
+    callWaiter: (reservationId: string) =>
+      api.post<APIResponse<CompanionSummary>>(`/reservations/companion/${reservationId}/call-waiter`),
+    requestBill: (reservationId: string) =>
+      api.post<APIResponse<CompanionSummary>>(`/reservations/companion/${reservationId}/request-bill`),
+  },
+};
+
+export const userAPI = {
+  getProfile: () => api.get<APIResponse<ProfileData>>('/users/profile'),
+  updateProfile: (data: Partial<ProfileData>) => api.put<APIResponse<ProfileData>>('/users/profile', data),
+};
+
+export const notificationAPI = {
+  get: () => api.get<APIResponse<AppNotification[]>>('/notifications', { params: { userEmail: localStorage.getItem('userEmail') ?? GUEST_EMAIL } }),
+  unreadCount: () => api.get<APIResponse<number>>('/notifications/unread-count', { params: { userEmail: localStorage.getItem('userEmail') ?? GUEST_EMAIL } }),
+  markRead: (id: number) => api.put<APIResponse<AppNotification>>(`/notifications/${id}/read`),
+  markAllRead: () => api.put<APIResponse<void>>('/notifications/read-all', undefined, { params: { userEmail: localStorage.getItem('userEmail') ?? GUEST_EMAIL } }),
 };
 
 export default api;

@@ -3,7 +3,6 @@ package com.ticketbooking.common.exception;
 import com.ticketbooking.common.response.ErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -45,11 +44,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<ErrorResponse> handleUnauthorized(UnauthorizedException ex, WebRequest request) {
         return buildError(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage(), request);
-    }
-
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex, WebRequest request) {
-        return buildError(HttpStatus.FORBIDDEN, "Forbidden", "Access denied", request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

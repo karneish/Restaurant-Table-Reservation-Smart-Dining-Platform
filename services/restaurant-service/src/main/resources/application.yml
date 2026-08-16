@@ -1,0 +1,28 @@
+server:
+  port: ${PORT:8083}
+spring:
+  application:
+    name: restaurant-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://ep-weathered-scene-azd9bah0-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require}
+    username: ${SPRING_DATASOURCE_USERNAME:neondb_owner}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      idle-timeout: 120000
+      connection-timeout: 30000
+  jpa:
+    hibernate:
+      ddl-auto: update
+eureka:
+  client:
+    enabled: false
+    registerWithEureka: false
+    fetchRegistry: false
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

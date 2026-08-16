@@ -1,0 +1,252 @@
+# =============================================================================
+# Render Blueprint - TableHub Restaurant Table Reservation System
+# =============================================================================
+# Deploys all 11 microservices as free web services (Singapore region, closest
+# to the Neon database). Services are built from the shared multi-stage
+# docker/backend.Dockerfile; the `MODULE` env var is translated by Render into
+# a Docker build argument that selects which Maven module to package.
+#
+# Service-to-service calls use each service's public onrender.com hostname.
+# The Java WebClient clients normalise scheme-less hosts to https://.
+#
+# After Blueprint creation you will be prompted for SPRING_DATASOURCE_PASSWORD
+# (the Neon PostgreSQL password) for every service that touches the database.
+# =============================================================================
+
+version: "1"
+
+envVarGroups:
+  - name: tablehub-db
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        value: "jdbc:postgresql://ep-weathered-scene-azd9bah0-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
+      - key: SPRING_DATASOURCE_USERNAME
+        value: neondb_owner
+
+  # Shared JWT signing secret. MUST be identical in api-gateway and auth-service
+  # or the gateway will reject every token issued by auth. Base64 of a long key
+  # so it satisfies JJWT's minimum 256-bit requirement.
+  - name: tablehub-jwt
+    envVars:
+      - key: APP_JWT_SECRET
+        value: "dGhpcyBpcyBhIHNlY3JldCBrZXkgZm9yIHRpY2tldCBib29raW5nIHN5c3RlbSB3aXRoIFNwcmluZyBCb290IGFuZCBKV1Q="
+
+services:
+  # ── 1. Service Registry (Eureka) ─────────────────────────────────────────
+  - type: web
+    name: tablehub-registry
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerContext: .
+    dockerfilePath: docker/backend.Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: MODULE
+        value: service-registry
+
+  # ── 2. Config Server ─────────────────────────────────────────────────────
+  - type: web
+    name: tablehub-config
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerContext: .
+    dockerfilePath: docker/backend.Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: MODULE
+        value: config-server
+      - key: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+        value: "https://tablehub-registry.onrender.com/eureka/"
+
+  # ── 3. API Gateway (single entry point) ──────────────────────────────────
+  - type: web
+    name: tablehub-gateway
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerContext: .
+    dockerfilePath: docker/backend.Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: MODULE
+        value: api-gateway
+      - key: CORS_ALLOWED_ORIGIN_PATTERNS
+        value: "https://*.vercel.app"
+      - key: AUTH_SERVICE_URL
+        value: "https://tablehub-auth.onrender.com"
+      - key: USER_SERVICE_URL
+        value: "https://tablehub-user.onrender.com"
+      - key: RESTAURANT_SERVICE_URL
+        value: "https://tablehub-restaurant.onrender.com"
+      - key: TABLE_SERVICE_URL
+        value: "https://tablehub-table.onrender.com"
+      - key: SLOT_SERVICE_URL
+        value: "https://tablehub-slot.onrender.com"
+      - key: RESERVATION_SERVICE_URL
+        value: "https://tablehub-reservation.onrender.com"
+      - key: PAYMENT_SERVICE_URL
+        value: "https://tablehub-payment.onrender.com"
+      - key: NOTIFICATION_SERVICE_URL
+        value: "https://tablehub-notification.onrender.com"
+      - fromGroup: tablehub-jwt
+
+  # ── 4. Auth Service ──────────────────────────────────────────────────────
+  - type: web
+    name: tablehub-auth
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerContext: .
+    dockerfilePath: docker/backend.Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: MODULE
+        value: auth-service
+      - fromGroup: tablehub-jwt
+      - fromGroup: tablehub-db
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+
+  # ── 5. User Service ──────────────────────────────────────────────────────
+  - type: web
+    name: tablehub-user
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerContext: .
+    dockerfilePath: docker/backend.Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: MODULE
+        value: user-service
+      - fromGroup: tablehub-db
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+
+  # ── 6. Restaurant Service (catalog + menu) ───────────────────────────────
+  - type: web
+    name: tablehub-restaurant
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerContext: .
+    dockerfilePath: docker/backend.Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: MODULE
+        value: restaurant-service
+      - fromGroup: tablehub-db
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+
+  # ── 7. Table Service (areas, tables, cleaning) ───────────────────────────
+  - type: web
+    name: tablehub-table
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerContext: .
+    dockerfilePath: docker/backend.Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: MODULE
+        value: table-service
+      - fromGroup: tablehub-db
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+
+  # ── 8. Slot Service (table slots / availability) ─────────────────────────
+  - type: web
+    name: tablehub-slot
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerContext: .
+    dockerfilePath: docker/backend.Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: MODULE
+        value: slot-service
+      - fromGroup: tablehub-db
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: TABLE_SERVICE_URL
+        fromService:
+          name: tablehub-table
+          type: web
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
+
+  # ── 9. Reservation Service (reservations, pre-order, waitlist) ───────────
+  - type: web
+    name: tablehub-reservation
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerContext: .
+    dockerfilePath: docker/backend.Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: MODULE
+        value: reservation-service
+      - fromGroup: tablehub-db
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: TABLE_SERVICE_URL
+        fromService:
+          name: tablehub-table
+          type: web
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
+      - key: SLOT_SERVICE_URL
+        fromService:
+          name: tablehub-slot
+          type: web
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
+      - key: RESTAURANT_SERVICE_URL
+        fromService:
+          name: tablehub-restaurant
+          type: web
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
+      - key: PAYMENT_SERVICE_URL
+        fromService:
+          name: tablehub-payment
+          type: web
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
+      - key: NOTIFICATION_SERVICE_URL
+        fromService:
+          name: tablehub-notification
+          type: web
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
+
+  # ── 10. Payment Service ──────────────────────────────────────────────────
+  - type: web
+    name: tablehub-payment
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerContext: .
+    dockerfilePath: docker/backend.Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: MODULE
+        value: payment-service
+      - fromGroup: tablehub-db
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+
+  # ── 11. Notification Service (simulated email/SMS + in-app inbox) ────────
+  - type: web
+    name: tablehub-notification
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerContext: .
+    dockerfilePath: docker/backend.Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: MODULE
+        value: notification-service
+      - fromGroup: tablehub-db
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false

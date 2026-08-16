@@ -22,28 +22,28 @@ public class FallbackController {
                 .body(APIResponse.error("User service is temporarily unavailable.")));
     }
 
-    @GetMapping("/fallback/movie")
-    public Mono<ResponseEntity<APIResponse<Void>>> movieFallback() {
+    @GetMapping("/fallback/restaurant")
+    public Mono<ResponseEntity<APIResponse<Void>>> restaurantFallback() {
         return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(APIResponse.error("Movie service is temporarily unavailable.")));
+                .body(APIResponse.error("Restaurant service is temporarily unavailable.")));
     }
 
-    @GetMapping("/fallback/theatre")
-    public Mono<ResponseEntity<APIResponse<Void>>> theatreFallback() {
+    @GetMapping("/fallback/table")
+    public Mono<ResponseEntity<APIResponse<Void>>> tableFallback() {
         return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(APIResponse.error("Theatre service is temporarily unavailable.")));
+                .body(APIResponse.error("Table service is temporarily unavailable.")));
     }
 
-    @GetMapping("/fallback/show")
-    public Mono<ResponseEntity<APIResponse<Void>>> showFallback() {
+    @GetMapping("/fallback/slot")
+    public Mono<ResponseEntity<APIResponse<Void>>> slotFallback() {
         return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(APIResponse.error("Show service is temporarily unavailable.")));
+                .body(APIResponse.error("Slot service is temporarily unavailable.")));
     }
 
-    @GetMapping("/fallback/booking")
-    public Mono<ResponseEntity<APIResponse<Void>>> bookingFallback() {
+    @GetMapping("/fallback/reservation")
+    public Mono<ResponseEntity<APIResponse<Void>>> reservationFallback() {
         return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(APIResponse.error("Booking service is temporarily unavailable. Please try again later.")));
+                .body(APIResponse.error("Reservation service is temporarily unavailable. Please try again later.")));
     }
 
     @GetMapping("/fallback/payment")
