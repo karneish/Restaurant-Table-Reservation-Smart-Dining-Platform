@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ForestBackground from './components/ForestBackground';
@@ -13,6 +13,13 @@ import ReservationDetailPage from './pages/ReservationDetailPage';
 import AdminDashboard from './pages/AdminDashboard';
 import ProfilePage from './pages/ProfilePage';
 import TableCompanionPage from './pages/TableCompanionPage';
+
+function RequireAuth({ children, adminOnly }: { children: React.ReactNode; adminOnly?: boolean }) {
+  const { isAuthenticated, isAdmin } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/" replace />;
+  if (adminOnly && !isAdmin) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
 
 function AppRoutes() {
   return (
@@ -29,7 +36,7 @@ function AppRoutes() {
           <Route path="/reservations/:reservationId" element={<ReservationDetailPage />} />
           <Route path="/table/:reservationId" element={<TableCompanionPage />} />
           <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin" element={<RequireAuth adminOnly><AdminDashboard /></RequireAuth>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

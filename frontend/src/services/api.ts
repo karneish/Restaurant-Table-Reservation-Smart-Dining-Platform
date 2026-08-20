@@ -118,7 +118,7 @@ export const tableAPI = {
   getById: (id: number) => api.get<APIResponse<RestaurantTable>>(`/tables/${id}`),
   findMatches: (params: { restaurantId: number; partySize: number; zone?: string; accessible?: boolean; quiet?: boolean; occasion?: string }) =>
     api.get<APIResponse<MatchResult[]>>('/tables/match', { params }),
-  updateCleaning: (id: number, data: { cleaningStatus: string }) =>
+  updateCleaning: (id: number, data: { status: string; staffEmail?: string; note?: string }) =>
     api.put<APIResponse<RestaurantTable>>(`/tables/${id}/cleaning`, data),
 };
 
@@ -152,8 +152,8 @@ export const reservationAPI = {
     api.get<APIResponse<Reservation>>(`/reservations/reservation/${reservationId}`),
   getByUser: () => api.get<APIResponse<Reservation[]>>('/reservations/user'),
   getAll: () => api.get<APIResponse<Reservation[]>>('/reservations'),
-  updateStatus: (reservationId: string, status: string) =>
-    api.put<APIResponse<Reservation>>(`/reservations/${reservationId}/status`, { status }),
+  updateStatus: (reservationId: string, status: string, staffEmail?: string) =>
+    api.put<APIResponse<Reservation>>(`/reservations/${reservationId}/status`, { status, staffEmail }),
   submitPreOrder: (reservationId: string) =>
     api.post<APIResponse<Reservation>>(`/reservations/${reservationId}/preorder`),
   updatePreOrderStatus: (preOrderId: number, status: string) =>

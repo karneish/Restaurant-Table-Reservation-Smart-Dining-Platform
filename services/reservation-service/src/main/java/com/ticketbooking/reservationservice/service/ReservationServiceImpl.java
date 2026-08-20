@@ -298,24 +298,28 @@ public class ReservationServiceImpl implements ReservationService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ReservationDTO getReservationByReservationId(String reservationId) {
         return toDTO(reservationRepository.findByReservationId(reservationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found with id: " + reservationId)));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ReservationDTO getReservationById(Long id) {
         return toDTO(reservationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation", id)));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ReservationDTO> getReservationsByUser(String userEmail) {
         return reservationRepository.findByUserEmailOrderByCreatedAtDesc(userEmail).stream()
                 .map(this::toDTO).collect(Collectors.toList());
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ReservationDTO> getAllReservations() {
         return reservationRepository.findAll().stream().map(this::toDTO).collect(Collectors.toList());
     }
@@ -414,17 +418,20 @@ public class ReservationServiceImpl implements ReservationService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<TableWaitlistEntry> getUserWaitlist(String userEmail) {
         return waitlistRepository.findByUserEmail(userEmail);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<OccasionAddOnDTO> getOccasionAddOns() {
         return occasionAddOnRepository.findByActiveTrue().stream()
                 .map(this::toAddOnDTO).collect(Collectors.toList());
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<OccasionAddOnDTO> getOccasionAddOnsForOccasion(String occasion) {
         if (occasion == null || occasion.isBlank()) {
             return getOccasionAddOns();
@@ -434,6 +441,7 @@ public class ReservationServiceImpl implements ReservationService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public CompanionSummaryDTO getCompanionSummary(String reservationId) {
         Reservation reservation = reservationRepository.findByReservationId(reservationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found with id: " + reservationId));

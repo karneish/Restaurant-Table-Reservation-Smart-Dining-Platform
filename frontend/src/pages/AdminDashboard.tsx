@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import toast from 'react-hot-toast';
 import {
   Store, UtensilsCrossed, Grid3x3, Table2, Clock, CalendarDays,
@@ -6,6 +7,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { restaurantAPI, tableAPI, slotAPI, reservationAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import type { Restaurant, MenuItem, DiningArea, RestaurantTable, Reservation, TableSlot } from '../types';
 import PageHeader from '../components/PageHeader';
 import Button from '../components/ui/Button';
@@ -100,7 +102,7 @@ export default function AdminDashboard() {
 
 /* ==================== TAB WRAPPERS ==================== */
 
-function TabCard({ title, icon: Icon, children }: { title: string; icon: LucideIcon; children: React.ReactNode }) {
+function TabCard({ title, icon: Icon, children }: { title: string; icon: LucideIcon; children: ReactNode }) {
   return (
     <div className="card p-6">
       <h2 className="font-display text-lg font-semibold text-forest-900 mb-4 flex items-center gap-2">
@@ -678,6 +680,7 @@ function SlotsTab() {
 /* ==================== RESERVATIONS ==================== */
 
 function ReservationsTab() {
+  const { userEmail } = useAuth();
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [query, setQuery] = useState('');
 
@@ -688,7 +691,7 @@ function ReservationsTab() {
 
   const updateStatus = async (r: Reservation, status: string) => {
     try {
-      await reservationAPI.updateStatus(r.reservationId, status);
+      await reservationAPI.updateStatus(r.reservationId, status, userEmail);
       toast.success(`Status set to ${status}`);
       load();
     } catch (err: any) {
