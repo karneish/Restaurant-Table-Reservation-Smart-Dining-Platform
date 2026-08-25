@@ -508,3 +508,8 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## License
 
 This project is licensed under the MIT License.
+---
+
+## Author
+
+**KARNEISH S** | [GitHub](https://github.com/karneish) | [LinkedIn](https://www.linkedin.com/in/karneish-pm)
