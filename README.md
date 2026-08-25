@@ -497,3 +497,14 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 <p align="center">
   Built with ❤️ using Spring Boot, React, and PostgreSQL
 </p>
+---
+
+## Author
+
+**Karneish P**
+- GitHub: [@karneish](https://github.com/karneish)
+- Email: karneish.sk@gmail.com
+
+## License
+
+This project is licensed under the MIT License.
