@@ -41,6 +41,14 @@
             <groupId>org.mapstruct</groupId>
             <artifactId>mapstruct</artifactId>
         </dependency>
+        <!-- JPA annotations API only. Optional so it does not leak the JPA
+             runtime into reactive consumers (e.g. api-gateway). AuditEntity
+             only needs the annotation types to compile. -->
+        <dependency>
+            <groupId>jakarta.persistence</groupId>
+            <artifactId>jakarta.persistence-api</artifactId>
+            <optional>true</optional>
+        </dependency>
     </dependencies>
 
     <build>
