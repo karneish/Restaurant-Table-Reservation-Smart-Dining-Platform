@@ -1,0 +1,13 @@
+﻿version: "3.8"
+services:
+  frontend:
+    volumes:
+      - ./frontend/src:/app/src:ro
+  auth-service:
+    environment:
+      - SPRING_JPA_SHOW_SQL=true
+      - LOGGING_LEVEL_COM_TICKETBOOKING=DEBUG
+  reservation-service:
+    environment:
+      - SPRING_JPA_SHOW_SQL=true
+      - LOGGING_LEVEL_COM_TICKETBOOKING=DEBUG
