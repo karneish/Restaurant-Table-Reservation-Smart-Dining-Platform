@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/restaurants")
@@ -71,6 +72,12 @@ public class RestaurantController {
     @Operation(summary = "Update restaurant (Admin)")
     public ResponseEntity<APIResponse<RestaurantDTO>> updateRestaurant(@PathVariable Long id, @Valid @RequestBody RestaurantRequest request) {
         return ResponseEntity.ok(APIResponse.success("Restaurant updated", restaurantService.updateRestaurant(id, request)));
+    }
+
+    @PutMapping("/{id}/rating")
+    @Operation(summary = "Update aggregated guest rating (internal - called after feedback)")
+    public ResponseEntity<APIResponse<RestaurantDTO>> updateRating(@PathVariable Long id, @RequestBody Map<String, Double> request) {
+        return ResponseEntity.ok(APIResponse.success("Rating updated", restaurantService.updateRating(id, request.get("rating"))));
     }
 
     @DeleteMapping("/{id}")

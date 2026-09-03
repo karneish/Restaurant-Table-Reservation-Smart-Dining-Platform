@@ -52,4 +52,24 @@ public class RestaurantServiceClient {
         log.warn("Restaurant service is down. Cannot fetch restaurant details for id: {}", restaurantId);
         return null;
     }
+
+    @CircuitBreaker(name = "restaurantService", fallbackMethod = "fallbackUpdateRating")
+    public void updateRating(Long restaurantId, Double rating) {
+        try {
+            java.util.Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("rating", rating);
+            webClient.put()
+                    .uri("/api/restaurants/{id}/rating", restaurantId)
+                    .bodyValue(payload)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+        } catch (Exception e) {
+            fallbackUpdateRating(restaurantId, rating, e);
+        }
+    }
+
+    public void fallbackUpdateRating(Long restaurantId, Double rating, Throwable t) {
+        log.warn("Could not sync aggregated rating {} for restaurant {}: {}", rating, restaurantId, t.getMessage());
+    }
 }

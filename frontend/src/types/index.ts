@@ -106,7 +106,8 @@ export interface Payment {
   amount: number;
   paymentMethod: string;
   status: string;
-  bookingId: number;
+  bookingId?: number;
+  paymentType?: string;
   createdAt: string;
 }
 
@@ -128,6 +129,8 @@ export interface Reservation {
   celebrationNotes?: string;
   waiterCalled?: boolean;
   billRequested?: boolean;
+  billPaid?: boolean;
+  billAmount?: number;
   addOns?: OccasionAddOn[];
   tables: RestaurantTable[];
   preOrder?: PreOrder;
@@ -160,6 +163,53 @@ export interface CompanionSummary {
   preOrder?: PreOrder;
   waiterCalled?: boolean;
   billRequested?: boolean;
+  billPaid?: boolean;
+  feedbackSubmitted?: boolean;
+  amountDue?: number;
+}
+
+export interface BillLineItem {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface Bill {
+  reservationId: string;
+  confirmationCode: string;
+  restaurantName: string;
+  restaurantCity?: string;
+  tableNumbers: string[];
+  lines: BillLineItem[];
+  subtotal: number;
+  depositPaid: number;
+  amountDue: number;
+  paid: boolean;
+  paidAt?: string;
+  billAmount?: number;
+  transactionId?: string;
+  paymentMethod?: string;
+}
+
+export interface FeedbackInput {
+  foodRating: number;
+  serviceRating: number;
+  ambienceRating: number;
+  comment?: string;
+}
+
+export interface FeedbackRecord {
+  id: number;
+  reservationId: string;
+  restaurantId: number;
+  userEmail?: string;
+  foodRating: number;
+  serviceRating: number;
+  ambienceRating: number;
+  overallRating: number;
+  comment?: string;
+  createdAt: string;
 }
 
 export interface AppNotification {

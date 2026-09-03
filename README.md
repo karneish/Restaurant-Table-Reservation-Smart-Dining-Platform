@@ -125,11 +125,38 @@ All 11 microservices share a **single PostgreSQL 16 database** (`ticket_booking_
 - **🪑 Smart Table Matching** — Match tables by party size, zone, accessibility, and quiet-area preferences
 - **📋 Pre-Order** — Order from the menu in advance, managed by staff (DRAFT → PLACED → IN_PREP → SERVED)
 - **💵 Deposit Payment** — Pay a deposit to confirm reservations
+- **📱 Virtual QR Payment** — Scan the payment QR (or tap *Pay*) to view your itemized bill — pre-order + celebration add-ons minus the credited deposit — and settle it via UPI/Card/Cash. Paying auto-completes the visit: tables flip to cleaning, pre-orders are marked served and staff are notified instantly.
+- **⭐ Feedback QR & Dynamic Ratings** — After checkout, scan the feedback QR to rate Food, Service and Ambience (1–5) with an optional comment. One review per visit; restaurant ratings on TableHub update automatically from guest feedback.
 - **🧹 Cleaning Management** — Track table cleaning status (READY / DIRTY) with audit log
 - **📋 Waitlist** — Auto-notification when a slot becomes available
 - **🖥️ Admin Dashboard** — Manage restaurants, menus, dining areas, tables, slots, and reservations
 - **📱 Responsive UI** — Mobile-first design with TailwindCSS
 - **🚀 Docker + PostgreSQL** — Full 12-container stack via Docker Compose; zero-config local start
+
+---
+
+## 📲 Virtual QR Payment & Feedback Flows
+
+```
+DINE-IN (SEATED)                          AFTER THE VISIT (COMPLETED)
+─────────────────────────                 ─────────────────────────────
+Request bill  →  Payment QR shown         Visit completed → Feedback QR shown
+      │            (Reservation page,           │        (Reservation page +
+      │             /pay/{reservationId})       │         companion thanks-card)
+      ▼                                         ▼
+Scan with any phone → itemized bill       Scan → rate Food/Service/Ambience
+pre-order + add-ons − deposit credit            + optional comment
+      │                                         │
+      ▼                                         ▼
+UPI / Card / Cash → payment-service       One review per visit → averages
+      │                                         sync to restaurant rating
+      ▼
+Bill PAID → visit auto-completes
+(tables→DIRTY, pre-order→SERVED,
+ slot→CLOSED, guest + staff notified)
+```
+
+Both QRs encode plain URLs (`{origin}/pay/{reservationId}` and `{origin}/feedback/{reservationId}`), so any phone camera works — no app install needed.
 
 ---
 
@@ -196,8 +223,8 @@ scripts\run-all.ps1
 | **Frontend**      | http://localhost:3000             |
 | **API Gateway**   | http://localhost:8080             |
 | **Eureka**        | http://localhost:8761             |
-| **pgAdmin4**      | http://localhost:5050             |
-| **PostgreSQL 18** | localhost:5432 (`ticket_user` / `root123`) |
+| **pgAdmin4**      | http://localhost:5051             |
+| **PostgreSQL 18** | localhost:5433 (`ticket_user` / `root123`) |
 
 ### Resetting the Data
 
@@ -389,6 +416,11 @@ All endpoints are proxied through the API Gateway at `http://localhost:8080`.
 | PUT    | `/api/reservations/preorders/{preOrderId}/status` | Update pre-order status | ✅ (Admin) |
 | POST   | `/api/reservations/waitlist`                | Join waitlist             | ✅            |
 | GET    | `/api/reservations/waitlist/user`           | Get user's waitlist entries | ✅          |
+| GET    | `/api/reservations/companion/{id}/bill`     | Itemized bill (QR-safe)   | ❌            |
+| POST   | `/api/reservations/companion/{id}/pay-bill` | Settle bill via virtual QR payment (auto-completes visit) | ❌ |
+| POST   | `/api/reservations/{id}/feedback`           | Submit feedback (Food/Service/Ambience 1–5) | ❌ (QR) |
+| GET    | `/api/restaurants/{id}/rating`              | Aggregated guest rating sync endpoint (`PUT`) | Internal |
+| GET    | `/api/reservations/feedback/restaurant/{restaurantId}` | Guest reviews per restaurant | ✅ (Admin) |
 
 ### Payments — `/api/payments/*`
 

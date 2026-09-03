@@ -97,6 +97,16 @@ public class RestaurantServiceImpl implements RestaurantService {
     }
 
     @Override
+    public RestaurantDTO updateRating(Long id, Double rating) {
+        Restaurant restaurant = restaurantRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Restaurant", id));
+        double safe = rating == null ? 0 : Math.max(0, Math.min(5, rating));
+        restaurant.setRating(Math.round(safe * 10) / 10.0);
+        log.info("Restaurant {} aggregated rating updated to {}", restaurant.getName(), restaurant.getRating());
+        return toDTO(restaurantRepository.save(restaurant));
+    }
+
+    @Override
     public void deleteRestaurant(Long id) {
         Restaurant restaurant = restaurantRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Restaurant", id));

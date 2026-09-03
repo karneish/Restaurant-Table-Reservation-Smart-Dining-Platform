@@ -3,10 +3,10 @@ import { useParams, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   MapPin, Users, BellRing, Receipt, UtensilsCrossed, CheckCircle2,
-  PartyPopper, Sparkles, Timer, BellRing as BellRingOn,
+  PartyPopper, Sparkles, Timer, BellRing as BellRingOn, Wallet, MessageSquareHeart,
 } from 'lucide-react';
 import { reservationAPI, errorMessage } from '../services/api';
-import type { CompanionSummary } from '../types';
+import type { CompanionSummary, Bill } from '../types';
 import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
 import { formatINR } from '../utils/format';
@@ -14,6 +14,7 @@ import { formatINR } from '../utils/format';
 export default function TableCompanionPage() {
   const { reservationId } = useParams<{ reservationId: string }>();
   const [summary, setSummary] = useState<CompanionSummary | null>(null);
+  const [bill, setBill] = useState<Bill | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -25,6 +26,13 @@ export default function TableCompanionPage() {
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [reservationId]);
+
+  useEffect(() => {
+    if (!reservationId || !summary || summary.status !== 'SEATED' || summary.billPaid) return;
+    reservationAPI.companion.getBill(reservationId)
+      .then((res) => setBill(res.data.data))
+      .catch(() => undefined);
+  }, [reservationId, summary]);
 
   const callWaiter = async () => {
     if (!reservationId) return;
@@ -166,6 +174,47 @@ export default function TableCompanionPage() {
         </div>
       )}
 
+      {seated && !summary.billPaid && bill && (
+        <div className="card p-5 border-gold-200 bg-gold-50/50">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h2 className="font-semibold text-forest-900 flex items-center gap-2 text-sm">
+              <Wallet className="w-4 h-4 text-gold-600" /> Your bill
+            </h2>
+            <span className="font-display font-bold text-xl text-primary-700">{formatINR(bill.amountDue)}</span>
+          </div>
+          {bill.lines.length > 0 && (
+            <div className="divide-y divide-primary-100 mb-2">
+              {bill.lines.slice(0, 4).map((line, i) => (
+                <div key={i} className="flex justify-between py-1.5 text-xs">
+                  <span className="text-forest-600 truncate pr-2">
+                    {line.description}{line.quantity > 1 ? ` × ${line.quantity}` : ''}
+                  </span>
+                  <span className="font-semibold text-forest-700 whitespace-nowrap">{formatINR(line.total)}</span>
+                </div>
+              ))}
+              {bill.lines.length > 4 && (
+                <p className="text-[11px] text-forest-400 pt-1.5">+{bill.lines.length - 4} more item{bill.lines.length - 4 > 1 ? 's' : ''}</p>
+              )}
+            </div>
+          )}
+          <p className="text-[11px] text-forest-400 mb-3">Deposit of {formatINR(bill.depositPaid)} already credited.</p>
+          <Link to={`/pay/${summary.reservationId}`} className="block">
+            <Button variant="gold" className="w-full !py-3.5">
+              <Wallet className="w-4 h-4" /> Pay {formatINR(bill.amountDue)} via QR
+            </Button>
+          </Link>
+        </div>
+      )}
+
+      {summary.billPaid && (
+        <div className="card !p-4 flex items-center gap-3 text-sm text-green-800 bg-green-50 border-green-200">
+          <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-green-500 to-green-700 text-white flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-4 h-4" />
+          </span>
+          Bill settled — thank you for dining with us!
+        </div>
+      )}
+
       {!seated ? (
         <div className="card p-6 text-center">
           <Sparkles className="w-10 h-10 mx-auto mb-3 text-primary-400 anim-float" />
@@ -185,10 +234,18 @@ export default function TableCompanionPage() {
             {summary.billRequested ? 'Bill requested' : 'Request the bill'}
           </Button>
           {summary.status === 'COMPLETED' && (
-            <div className="card !p-4 flex items-center gap-3 text-sm text-emerald-700 bg-emerald-50 border-emerald-200">
-              <CheckCircle2 className="w-5 h-5 shrink-0" />
-              Thanks for dining with us! See you next time.
-            </div>
+            !summary.feedbackSubmitted ? (
+              <Link to={`/feedback/${summary.reservationId}`} className="block">
+                <Button variant="gold" className="w-full !py-4" size="lg">
+                  <MessageSquareHeart className="w-5 h-5" /> Rate your experience
+                </Button>
+              </Link>
+            ) : (
+              <div className="card !p-4 flex items-center gap-3 text-sm text-emerald-700 bg-emerald-50 border-emerald-200">
+                <CheckCircle2 className="w-5 h-5 shrink-0" />
+                Thanks for dining with us — and for your review! See you next time.
+              </div>
+            )
           )}
         </div>
       )}

@@ -37,6 +37,7 @@ public class ReservationServiceImpl implements ReservationService {
     private final TableWaitlistRepository waitlistRepository;
     private final OccasionAddOnRepository occasionAddOnRepository;
     private final ReservationAddOnRepository reservationAddOnRepository;
+    private final FeedbackRepository feedbackRepository;
     private final SlotServiceClient slotServiceClient;
     private final TableServiceClient tableServiceClient;
     private final MenuServiceClient menuServiceClient;
@@ -188,12 +189,13 @@ public class ReservationServiceImpl implements ReservationService {
                 .amount(reservation.getDepositAmount())
                 .paymentMethod(paymentMethod)
                 .status(Payment.PaymentStatus.SUCCESS)
+                .paymentType(Payment.PaymentType.DEPOSIT)
                 .reservation(reservation)
                 .build();
         payment = paymentRepository.save(payment);
+        reservation.getPayments().add(payment);
 
         reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
-        reservation.setPayment(payment);
         reservation.setHoldExpiresAt(null);
         reservation = reservationRepository.save(reservation);
 
@@ -346,20 +348,7 @@ public class ReservationServiceImpl implements ReservationService {
                         "You're seated!",
                         "Welcome! Use the QR at your table to call a waiter, reorder, or request the bill.");
             }
-            case COMPLETED -> {
-                reservation.setStatus(Reservation.ReservationStatus.COMPLETED);
-                for (ReservedTable reservedTable : reservation.getReservedTables()) {
-                    tableServiceClient.updateCleaningStatus(reservedTable.getTableId(), "DIRTY", staffEmail, "Guests departed - cleaning needed");
-                }
-                if (reservation.getPreOrder() != null && reservation.getPreOrder().getStatus() != PreOrder.PreOrderStatus.CANCELLED) {
-                    reservation.getPreOrder().setStatus(PreOrder.PreOrderStatus.SERVED);
-                    preOrderRepository.save(reservation.getPreOrder());
-                }
-                slotServiceClient.updateSlotStatus(reservation.getSlotId(), "CLOSED");
-                notificationServiceClient.sendNotification(reservation.getUserEmail(), "COMPLETED",
-                        "Thank you for dining with us!",
-                        "We hope you enjoyed your visit. Scan your QR to leave a review or book again soon.");
-            }
+            case COMPLETED -> completeVisit(reservation, staffEmail);
             default -> throw new BookingException("Staff can only set SEATED or COMPLETED status");
         }
 
@@ -485,8 +474,251 @@ public class ReservationServiceImpl implements ReservationService {
     }
 
     private String getRestaurantName(Long restaurantId) {
-        RestaurantDTO restaurant = restaurantServiceClient.getRestaurantById(restaurantId);
+        RestaurantDTO restaurant = fetchRestaurant(restaurantId);
         return restaurant != null && restaurant.getName() != null ? restaurant.getName() : "our restaurant";
+    }
+
+    private RestaurantDTO fetchRestaurant(Long restaurantId) {
+        return restaurantServiceClient.getRestaurantById(restaurantId);
+    }
+
+    /** Shared completion flow: tables to cleaning, pre-order served, slot closed, guest thanked. */
+    private void completeVisit(Reservation reservation, String actorEmail) {
+        reservation.setStatus(Reservation.ReservationStatus.COMPLETED);
+        for (ReservedTable reservedTable : reservation.getReservedTables()) {
+            tableServiceClient.updateCleaningStatus(reservedTable.getTableId(), "DIRTY", actorEmail, "Guests departed - cleaning needed");
+        }
+        if (reservation.getPreOrder() != null && reservation.getPreOrder().getStatus() != PreOrder.PreOrderStatus.CANCELLED) {
+            reservation.getPreOrder().setStatus(PreOrder.PreOrderStatus.SERVED);
+            preOrderRepository.save(reservation.getPreOrder());
+        }
+        slotServiceClient.updateSlotStatus(reservation.getSlotId(), "CLOSED");
+        notificationServiceClient.sendNotification(reservation.getUserEmail(), "COMPLETED",
+                "Thank you for dining with us!",
+                "We hope you enjoyed your visit. Scan your QR to leave a review or book again soon.");
+    }
+
+    // ==================== BILL & QR PAYMENT ====================
+
+    @Override
+    @Transactional(readOnly = true)
+    public BillDTO getBill(String reservationId) {
+        Reservation reservation = requireReservationForBilling(reservationId);
+        return buildBill(reservation);
+    }
+
+    @Override
+    @Transactional
+    public BillDTO payBill(String reservationId, String paymentMethod) {
+        Reservation reservation = reservationRepository.findByReservationId(reservationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Reservation not found with id: " + reservationId));
+        if (reservation.getStatus() != Reservation.ReservationStatus.SEATED) {
+            throw new BookingException("Bills can only be paid while your visit is in progress");
+        }
+        if (Boolean.TRUE.equals(reservation.getBillPaid())) {
+            throw new BookingException("This bill has already been settled. Thank you!");
+        }
+        BigDecimal due = computeAmountDue(reservation);
+        if (due.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BookingException("Nothing to pay - your deposit covers this visit.");
+        }
+
+        PaymentDTO processed = paymentServiceClient.processPayment(
+                reservation.getId(), due, paymentMethod, null, null, null, null, null);
+
+        Payment payment = Payment.builder()
+                .transactionId(processed != null && processed.getTransactionId() != null
+                        ? processed.getTransactionId() : IdGenerator.generateTransactionId())
+                .amount(due)
+                .paymentMethod(paymentMethod)
+                .status(Payment.PaymentStatus.SUCCESS)
+                .paymentType(Payment.PaymentType.BILL)
+                .reservation(reservation)
+                .build();
+        payment = paymentRepository.save(payment);
+        reservation.getPayments().add(payment);
+
+        reservation.setBillPaid(true);
+        reservation.setBillAmount(due);
+        reservation.setBillPaidAt(LocalDateTime.now());
+
+        notificationServiceClient.sendNotification(reservation.getUserEmail(), "PAYMENT_RECEIVED",
+                "Payment received",
+                "We received your payment of \u20B9" + due + " for reservation " + reservationId
+                        + ". Transaction " + payment.getTransactionId() + ". Thank you!");
+
+        completeVisit(reservation, "guest QR payment");
+
+        String tableNumbers = reservation.getReservedTables().stream()
+                .map(ReservedTable::getTableNumber).collect(Collectors.joining(", "));
+        notificationServiceClient.sendNotification("staff@restaurant.com", "BILL_PAID",
+                "Bill settled via QR",
+                "Table " + tableNumbers + " (reservation " + reservationId + ") settled \u20B9" + due
+                        + " via QR payment (" + paymentMethod + ").");
+
+        eventPublisher.publishReservation(toDTO(reservation));
+        log.info("Bill paid for reservation {} - amount {} via {}", reservationId, due, paymentMethod);
+        return buildBill(reservationRepository.save(reservation));
+    }
+
+    private Reservation requireReservationForBilling(String reservationId) {
+        Reservation reservation = reservationRepository.findByReservationId(reservationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Reservation not found with id: " + reservationId));
+        if (reservation.getStatus() != Reservation.ReservationStatus.SEATED
+                && reservation.getStatus() != Reservation.ReservationStatus.COMPLETED) {
+            throw new BookingException("The bill opens once your party is seated");
+        }
+        return reservation;
+    }
+
+    private BillDTO buildBill(Reservation reservation) {
+        RestaurantDTO restaurant = fetchRestaurant(reservation.getRestaurantId());
+        List<BillLineDTO> lines = new ArrayList<>();
+        BigDecimal subtotal = BigDecimal.ZERO;
+
+        if (reservation.getPreOrder() != null && reservation.getPreOrder().getStatus() != PreOrder.PreOrderStatus.CANCELLED) {
+            for (PreOrderItem item : reservation.getPreOrder().getItems()) {
+                BigDecimal total = item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+                lines.add(BillLineDTO.builder()
+                        .description(item.getName())
+                        .quantity(item.getQuantity())
+                        .unitPrice(item.getUnitPrice())
+                        .total(total)
+                        .build());
+                subtotal = subtotal.add(total);
+            }
+        }
+        for (ReservationAddOn addOn : reservation.getAddOns()) {
+            lines.add(BillLineDTO.builder()
+                    .description(addOn.getName() + " (celebration add-on)")
+                    .quantity(addOn.getQuantity())
+                    .unitPrice(addOn.getUnitPrice())
+                    .total(addOn.getTotalPrice())
+                    .build());
+            subtotal = subtotal.add(addOn.getTotalPrice());
+        }
+
+        Payment billPayment = paymentRepository
+                .findTopByReservation_ReservationIdAndPaymentTypeOrderByIdDesc(
+                        reservation.getReservationId(), Payment.PaymentType.BILL)
+                .orElse(null);
+
+        return BillDTO.builder()
+                .reservationId(reservation.getReservationId())
+                .confirmationCode(reservation.getConfirmationCode())
+                .restaurantName(restaurant != null && restaurant.getName() != null ? restaurant.getName() : "Restaurant")
+                .restaurantCity(restaurant != null ? restaurant.getCity() : null)
+                .tableNumbers(reservation.getReservedTables().stream()
+                        .map(ReservedTable::getTableNumber).collect(Collectors.toList()))
+                .lines(lines)
+                .subtotal(subtotal)
+                .depositPaid(reservation.getDepositAmount())
+                .amountDue(computeAmountDue(reservation))
+                .paid(Boolean.TRUE.equals(reservation.getBillPaid()))
+                .paidAt(reservation.getBillPaidAt())
+                .billAmount(reservation.getBillAmount())
+                .transactionId(billPayment != null ? billPayment.getTransactionId() : null)
+                .paymentMethod(billPayment != null ? billPayment.getPaymentMethod() : null)
+                .build();
+    }
+
+    private BigDecimal computeAmountDue(Reservation reservation) {
+        BigDecimal subtotal = BigDecimal.ZERO;
+        if (reservation.getPreOrder() != null
+                && reservation.getPreOrder().getStatus() != PreOrder.PreOrderStatus.CANCELLED) {
+            subtotal = subtotal.add(reservation.getPreOrder().getTotalAmount());
+        }
+        for (ReservationAddOn addOn : reservation.getAddOns()) {
+            subtotal = subtotal.add(addOn.getTotalPrice());
+        }
+        BigDecimal due = subtotal.subtract(reservation.getDepositAmount());
+        return due.max(BigDecimal.ZERO);
+    }
+
+    // ==================== FEEDBACK ====================
+
+    @Override
+    @Transactional
+    public FeedbackDTO submitFeedback(String reservationId, FeedbackRequest request, String userEmail) {
+        Reservation reservation = reservationRepository.findByReservationId(reservationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Reservation not found with id: " + reservationId));
+        if (reservation.getStatus() != Reservation.ReservationStatus.COMPLETED) {
+            throw new BookingException("Feedback opens after your visit is completed");
+        }
+        if (feedbackRepository.existsByReservationId(reservation.getReservationId())) {
+            throw new BookingException("Feedback was already submitted for this visit");
+        }
+
+        int food = clampRating(request.getFoodRating());
+        int service = clampRating(request.getServiceRating());
+        int ambience = clampRating(request.getAmbienceRating());
+        double overall = Math.round(((food + service + ambience) / 3.0) * 10) / 10.0;
+
+        Feedback feedback = Feedback.builder()
+                .reservationId(reservation.getReservationId())
+                .restaurantId(reservation.getRestaurantId())
+                .userEmail(userEmail != null && !userEmail.isBlank() ? userEmail : reservation.getUserEmail())
+                .foodRating(food)
+                .serviceRating(service)
+                .ambienceRating(ambience)
+                .overallRating(overall)
+                .comment(request.getComment())
+                .build();
+        feedback = feedbackRepository.save(feedback);
+
+        updateRestaurantRating(reservation.getRestaurantId());
+
+        String restaurantName = getRestaurantName(reservation.getRestaurantId());
+        notificationServiceClient.sendNotification(feedback.getUserEmail(), "FEEDBACK_THANK_YOU",
+                "Thanks for your feedback!",
+                "Your review of " + restaurantName + " means a lot to us. We hope to welcome you again soon!");
+        notificationServiceClient.sendNotification("staff@restaurant.com", "FEEDBACK_RECEIVED",
+                "New guest feedback",
+                "Reservation " + reservationId + " rated " + overall + "/5 at " + restaurantName
+                        + " (food " + food + ", service " + service + ", ambience " + ambience + ").");
+
+        log.info("Feedback submitted for reservation {}", reservationId);
+        return toFeedbackDTO(feedback);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<FeedbackDTO> getFeedbackForRestaurant(Long restaurantId) {
+        return feedbackRepository.findByRestaurantIdOrderByCreatedAtDesc(restaurantId).stream()
+                .map(this::toFeedbackDTO)
+                .collect(Collectors.toList());
+    }
+
+    private void updateRestaurantRating(Long restaurantId) {
+        List<Feedback> all = feedbackRepository.findByRestaurantIdOrderByCreatedAtDesc(restaurantId);
+        if (all.isEmpty()) {
+            return;
+        }
+        double average = all.stream().mapToDouble(Feedback::getOverallRating).average().orElse(0);
+        average = Math.round(average * 10) / 10.0;
+        restaurantServiceClient.updateRating(restaurantId, average);
+    }
+
+    private int clampRating(Integer rating) {
+        if (rating == null) {
+            return 3;
+        }
+        return Math.max(1, Math.min(5, rating));
+    }
+
+    private FeedbackDTO toFeedbackDTO(Feedback feedback) {
+        return FeedbackDTO.builder()
+                .id(feedback.getId())
+                .reservationId(feedback.getReservationId())
+                .restaurantId(feedback.getRestaurantId())
+                .userEmail(feedback.getUserEmail())
+                .foodRating(feedback.getFoodRating())
+                .serviceRating(feedback.getServiceRating())
+                .ambienceRating(feedback.getAmbienceRating())
+                .overallRating(feedback.getOverallRating())
+                .comment(feedback.getComment())
+                .createdAt(feedback.getCreatedAt())
+                .build();
     }
 
     private ReservationDTO toDTO(Reservation reservation) {
@@ -505,6 +737,8 @@ public class ReservationServiceImpl implements ReservationService {
                 .celebrationNotes(reservation.getCelebrationNotes())
                 .waiterCalled(reservation.getWaiterCalled())
                 .billRequested(reservation.getBillRequested())
+                .billPaid(reservation.getBillPaid())
+                .billAmount(reservation.getBillAmount())
                 .addOns(reservation.getAddOns().stream()
                         .map(ao -> OccasionAddOnDTO.builder()
                                 .id(ao.getAddOnId())
@@ -569,6 +803,9 @@ public class ReservationServiceImpl implements ReservationService {
                 .preOrder(reservation.getPreOrder() != null ? toPreOrderDTO(reservation.getPreOrder()) : null)
                 .waiterCalled(reservation.getWaiterCalled())
                 .billRequested(reservation.getBillRequested())
+                .billPaid(Boolean.TRUE.equals(reservation.getBillPaid()))
+                .feedbackSubmitted(feedbackRepository.existsByReservationId(reservation.getReservationId()))
+                .amountDue(computeAmountDue(reservation))
                 .build();
     }
 

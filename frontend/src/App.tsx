@@ -13,6 +13,8 @@ import ReservationDetailPage from './pages/ReservationDetailPage';
 import AdminDashboard from './pages/AdminDashboard';
 import ProfilePage from './pages/ProfilePage';
 import TableCompanionPage from './pages/TableCompanionPage';
+import VirtualPaymentPage from './pages/VirtualPaymentPage';
+import FeedbackPage from './pages/FeedbackPage';
 
 function RequireAuth({ children, adminOnly }: { children: React.ReactNode; adminOnly?: boolean }) {
   const { isAuthenticated, isAdmin } = useAuth();
@@ -35,6 +37,8 @@ function AppRoutes() {
           <Route path="/my-reservations" element={<MyReservationsPage />} />
           <Route path="/reservations/:reservationId" element={<ReservationDetailPage />} />
           <Route path="/table/:reservationId" element={<TableCompanionPage />} />
+          <Route path="/pay/:reservationId" element={<VirtualPaymentPage />} />
+          <Route path="/feedback/:reservationId" element={<FeedbackPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/admin" element={<RequireAuth adminOnly><AdminDashboard /></RequireAuth>} />
           <Route path="*" element={<Navigate to="/" replace />} />

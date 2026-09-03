@@ -28,6 +28,8 @@ public class ReservationDTO {
     private String celebrationNotes;
     private Boolean waiterCalled;
     private Boolean billRequested;
+    private Boolean billPaid;
+    private BigDecimal billAmount;
     private List<OccasionAddOnDTO> addOns;
     private List<RestaurantTableDTO> tables;
     private PreOrderDTO preOrder;

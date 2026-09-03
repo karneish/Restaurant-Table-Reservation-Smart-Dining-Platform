@@ -3,12 +3,12 @@ import type { ReactNode } from 'react';
 import toast from 'react-hot-toast';
 import {
   Store, UtensilsCrossed, Grid3x3, Table2, Clock, CalendarDays,
-  Plus, Trash2, CheckCircle2, ChefHat, Leaf, ShieldAlert, Search, Users2, Radio,
+  Plus, Trash2, CheckCircle2, ChefHat, Leaf, ShieldAlert, Search, Users2, Radio, MessageSquareHeart, Star,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { restaurantAPI, tableAPI, slotAPI, reservationAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import type { Restaurant, MenuItem, DiningArea, RestaurantTable, Reservation, TableSlot } from '../types';
+import type { Restaurant, MenuItem, DiningArea, RestaurantTable, Reservation, TableSlot, FeedbackRecord } from '../types';
 import PageHeader from '../components/PageHeader';
 import Button from '../components/ui/Button';
 import StatCard from '../components/ui/StatCard';
@@ -16,7 +16,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import { cn } from '../utils/cn';
 import { formatDateTime, formatINR, todayISO } from '../utils/format';
 
-type Tab = 'restaurants' | 'menu' | 'areas' | 'tables' | 'slots' | 'reservations' | 'live';
+type Tab = 'restaurants' | 'menu' | 'areas' | 'tables' | 'slots' | 'reservations' | 'feedback' | 'live';
 
 export default function AdminDashboard() {
   const [tab, setTab] = useState<Tab>('restaurants');
@@ -45,6 +45,7 @@ export default function AdminDashboard() {
     { key: 'tables', label: 'Tables', icon: Table2 },
     { key: 'slots', label: 'Slots', icon: Clock },
     { key: 'reservations', label: 'Reservations', icon: CalendarDays },
+    { key: 'feedback', label: 'Feedback', icon: MessageSquareHeart },
     { key: 'live', label: 'Live Ops', icon: Radio },
   ];
 
@@ -94,6 +95,7 @@ export default function AdminDashboard() {
         {tab === 'tables' && <TablesTab />}
         {tab === 'slots' && <SlotsTab />}
         {tab === 'reservations' && <ReservationsTab />}
+        {tab === 'feedback' && <FeedbackTab />}
         {tab === 'live' && <LiveOpsTab />}
       </div>
     </div>
@@ -760,7 +762,14 @@ function ReservationsTab() {
                   <td className="py-3">
                     {r.preOrder ? <StatusBadge status={r.preOrder.status} dot={false} /> : <span className="text-xs text-forest-300">—</span>}
                   </td>
-                  <td className="py-3"><StatusBadge status={r.status} dot={false} /></td>
+                  <td className="py-3">
+                    <StatusBadge status={r.status} dot={false} />
+                    {r.billPaid && (
+                      <span className="ml-1.5 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
+                        <CheckCircle2 className="w-3 h-3" /> Bill
+                      </span>
+                    )}
+                  </td>
                   <td className="py-3 text-right whitespace-nowrap">
                     {r.status === 'CONFIRMED' && (
                       <Button variant="secondary" size="sm" onClick={() => updateStatus(r, 'SEATED')} className="mr-1.5 !px-3">Seat</Button>
@@ -793,6 +802,110 @@ function ReservationsTab() {
             </tbody>
           </table>
         </div>
+      </TabCard>
+    </div>
+  );
+}
+
+/* ==================== FEEDBACK ==================== */
+
+function Stars({ value }: { value: number }) {
+  return (
+    <span className="inline-flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Star key={n} className={`w-3.5 h-3.5 ${n <= Math.round(value) ? 'text-gold-500 fill-gold-400' : 'text-forest-200'}`} />
+      ))}
+    </span>
+  );
+}
+
+function FeedbackTab() {
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [restaurantId, setRestaurantId] = useState<number | ''>('');
+  const [feedback, setFeedback] = useState<FeedbackRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    restaurantAPI.getAll().then((res) => setRestaurants(res.data.data)).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (restaurantId === '') { setFeedback([]); return; }
+    setLoading(true);
+    reservationAPI.getRestaurantFeedback(Number(restaurantId))
+      .then((res) => setFeedback(res.data.data))
+      .catch(() => setFeedback([]))
+      .finally(() => setLoading(false));
+  }, [restaurantId]);
+
+  const avg = (pick: (f: FeedbackRecord) => number) =>
+    feedback.length ? feedback.reduce((sum, f) => sum + pick(f), 0) / feedback.length : 0;
+
+  const summaryCards = [
+    { label: 'Overall', value: avg((f) => f.overallRating), accent: true },
+    { label: 'Food', value: avg((f) => f.foodRating) },
+    { label: 'Service', value: avg((f) => f.serviceRating) },
+    { label: 'Ambience', value: avg((f) => f.ambienceRating) },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <TabCard title="Guest feedback" icon={MessageSquareHeart}>
+        <select
+          className="select-field max-w-md"
+          value={restaurantId}
+          onChange={(e) => setRestaurantId(e.target.value ? Number(e.target.value) : '')}
+        >
+          <option value="">Select restaurant</option>
+          {restaurants.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+        </select>
+
+        {loading ? (
+          <div className="h-32 shimmer mt-4" />
+        ) : restaurantId !== '' && feedback.length > 0 ? (
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+              {summaryCards.map(({ label, value, accent }) => (
+                <div
+                  key={label}
+                  className={cn(
+                    'rounded-xl border p-4 text-center',
+                    accent ? 'bg-gold-50 border-gold-200' : 'bg-primary-50/50 border-primary-100',
+                  )}
+                >
+                  <p className="font-display text-2xl font-bold text-forest-900">{value.toFixed(1)}</p>
+                  <Stars value={value} />
+                  <p className={cn('text-xs font-semibold mt-1', accent ? 'text-gold-700' : 'text-forest-500')}>{label}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-forest-400 mt-2">{feedback.length} review{feedback.length > 1 ? 's' : ''} · averages sync to the restaurant's live rating automatically.</p>
+
+            <div className="space-y-3 mt-5">
+              {feedback.map((f) => (
+                <div key={f.id} className="rounded-xl border border-primary-100 bg-primary-50/40 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <Stars value={f.overallRating} />
+                      <span className="font-mono text-[11px] text-primary-600">{f.reservationId.slice(0, 8)}…</span>
+                      <span className="text-[11px] text-forest-400">{formatDateTime(f.createdAt)}</span>
+                    </div>
+                    <div className="flex gap-1.5 text-[10px] font-bold uppercase tracking-wide">
+                      <span className="rounded-full bg-white border border-primary-100 px-2 py-0.5 text-forest-600">Food {f.foodRating}</span>
+                      <span className="rounded-full bg-white border border-primary-100 px-2 py-0.5 text-forest-600">Service {f.serviceRating}</span>
+                      <span className="rounded-full bg-white border border-primary-100 px-2 py-0.5 text-forest-600">Vibe {f.ambienceRating}</span>
+                    </div>
+                  </div>
+                  {f.comment && <p className="text-sm text-forest-700 mt-2">“{f.comment}”</p>}
+                </div>
+              ))}
+            </div>
+          </>
+        ) : restaurantId !== '' ? (
+          <p className="text-forest-400 py-8 text-center">No feedback yet for this restaurant — reviews appear here the moment guests scan their feedback QR.</p>
+        ) : (
+          <p className="text-forest-400 py-8 text-center">Select a restaurant to see guest reviews and category averages.</p>
+        )}
       </TabCard>
     </div>
   );

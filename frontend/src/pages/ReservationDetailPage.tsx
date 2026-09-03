@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import {
   CalendarDays, Users, CreditCard, UtensilsCrossed, CheckCircle2,
   XCircle, ArrowLeft, Table2, Sprout, MapPin, Download, Ticket, Timer, PartyPopper,
+  Wallet, MessageSquareHeart,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { reservationAPI, errorMessage } from '../services/api';
@@ -215,6 +216,64 @@ export default function ReservationDetailPage() {
             </p>
           </div>
         </div>
+
+        {reservation.status === 'SEATED' && !reservation.billPaid && (
+          <div className="px-7 pb-6 border-t border-primary-100 pt-6 flex flex-col sm:flex-row items-center gap-5">
+            <div className="flex-1">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-forest-400 mb-1.5 flex items-center gap-1.5">
+                <Wallet className="w-3.5 h-3.5 text-primary-600" /> Virtual Payment QR
+              </p>
+              <p className="text-sm text-forest-500 mb-3">
+                Scan with any phone to view your itemized bill and settle it securely — UPI, card or cash.
+              </p>
+              <div className="bg-white rounded-xl p-3 inline-block border border-primary-200 shadow-soft">
+                <QRCodeSVG
+                  value={`${window.location.origin}/pay/${reservation.reservationId}`}
+                  size={132}
+                  bgColor="#ffffff"
+                  fgColor="#1a3a2b"
+                  level="M"
+                />
+              </div>
+              <div className="mt-3">
+                <Link to={`/pay/${reservation.reservationId}`}>
+                  <Button variant="gold" className="!py-3">
+                    <Wallet className="w-4 h-4" /> Open secure payment
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {reservation.status === 'COMPLETED' && (
+          <div className="px-7 pb-6 border-t border-primary-100 pt-6 flex flex-col sm:flex-row items-center gap-5">
+            <div className="flex-1">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-forest-400 mb-1.5 flex items-center gap-1.5">
+                <MessageSquareHeart className="w-3.5 h-3.5 text-gold-600" /> Feedback QR
+              </p>
+              <p className="text-sm text-forest-500 mb-3">
+                Scan to rate the food, service and ambience — your score updates this restaurant live.
+              </p>
+              <div className="bg-white rounded-xl p-3 inline-block border border-gold-200 shadow-soft">
+                <QRCodeSVG
+                  value={`${window.location.origin}/feedback/${reservation.reservationId}`}
+                  size={132}
+                  bgColor="#ffffff"
+                  fgColor="#b45309"
+                  level="M"
+                />
+              </div>
+              <div className="mt-3">
+                <Link to={`/feedback/${reservation.reservationId}`}>
+                  <Button variant="gold" className="!py-3">
+                    <MessageSquareHeart className="w-4 h-4" /> Rate your experience
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="border-t border-dashed border-primary-200 px-7 py-3 flex items-center justify-between text-xs text-forest-400">
           <span className="flex items-center gap-1.5"><Timer className="w-3.5 h-3.5" /> Booked {formatDateTime(reservation.createdAt)}</span>

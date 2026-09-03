@@ -21,7 +21,10 @@ public class Payment {
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private PaymentStatus status;
-    @OneToOne(fetch = FetchType.LAZY)
+    @Column(name = "payment_type")
+    @Enumerated(EnumType.STRING)
+    private PaymentType paymentType;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "reservation_id", nullable = false)
     private Reservation reservation;
     private LocalDateTime createdAt;
@@ -33,4 +36,10 @@ public class Payment {
     protected void onUpdate() { updatedAt = LocalDateTime.now(); }
 
     public enum PaymentStatus { PENDING, SUCCESS, FAILED, REFUNDED }
+    public enum PaymentType { DEPOSIT, BILL }
+
+    /** Rows created before the BILL type existed carry a null type and are deposits. */
+    public boolean isDepositPayment() {
+        return paymentType == null || paymentType == PaymentType.DEPOSIT;
+    }
 }

@@ -23,6 +23,9 @@ public class CompanionSummaryDTO {
     private PreOrderDTO preOrder;
     private Boolean waiterCalled;
     private Boolean billRequested;
+    private Boolean billPaid;
+    private Boolean feedbackSubmitted;
+    private java.math.BigDecimal amountDue;
     private String cleaningStatus;
     private Integer cleaningEtaMinutes;
 }

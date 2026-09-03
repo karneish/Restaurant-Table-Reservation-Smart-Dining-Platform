@@ -3,6 +3,7 @@ import type {
   APIResponse, Restaurant, DiningArea, RestaurantTable,
   TableSlot, MenuItem, MatchResult, Reservation, WaitlistEntry, AuthResponse,
   OccasionAddOn, CompanionSummary, AppNotification, ProfileData,
+  Bill, FeedbackInput, FeedbackRecord,
 } from '../types';
 import { GUEST_EMAIL } from '../context/AuthContext';
 
@@ -160,9 +161,13 @@ export const reservationAPI = {
     api.put<APIResponse<Reservation>>(`/reservations/preorders/${preOrderId}/status`, { status }),
   joinWaitlist: (data: { restaurantId: number; slotId?: number; partySize: number; preferredWindow?: string }) =>
     api.post<APIResponse<WaitlistEntry>>('/reservations/waitlist', data),
-  getWaitlistByUser: () => api.get<APIResponse<WaitlistEntry[]>>('/reservations/waitlist/user'),
+   getWaitlistByUser: () => api.get<APIResponse<WaitlistEntry[]>>('/reservations/waitlist/user'),
   getAddOns: (occasion?: string) =>
     api.get<APIResponse<OccasionAddOn[]>>('/reservations/add-ons', { params: occasion ? { occasion } : {} }),
+  submitFeedback: (reservationId: string, data: FeedbackInput) =>
+    api.post<APIResponse<FeedbackRecord>>(`/reservations/${reservationId}/feedback`, data),
+  getRestaurantFeedback: (restaurantId: number) =>
+    api.get<APIResponse<FeedbackRecord[]>>(`/reservations/feedback/restaurant/${restaurantId}`),
   companion: {
     get: (reservationId: string) =>
       api.get<APIResponse<CompanionSummary>>(`/reservations/companion/${reservationId}`),
@@ -170,6 +175,10 @@ export const reservationAPI = {
       api.post<APIResponse<CompanionSummary>>(`/reservations/companion/${reservationId}/call-waiter`),
     requestBill: (reservationId: string) =>
       api.post<APIResponse<CompanionSummary>>(`/reservations/companion/${reservationId}/request-bill`),
+    getBill: (reservationId: string) =>
+      api.get<APIResponse<Bill>>(`/reservations/companion/${reservationId}/bill`),
+    payBill: (reservationId: string, paymentMethod = 'UPI') =>
+      api.post<APIResponse<Bill>>(`/reservations/companion/${reservationId}/pay-bill`, { paymentMethod }),
   },
 };
 

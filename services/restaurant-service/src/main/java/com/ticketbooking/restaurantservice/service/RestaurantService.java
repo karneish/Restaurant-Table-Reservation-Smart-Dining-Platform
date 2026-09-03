@@ -16,6 +16,7 @@ public interface RestaurantService {
     List<RestaurantDTO> getRestaurantsByCity(String city);
     RestaurantDTO createRestaurant(RestaurantRequest request);
     RestaurantDTO updateRestaurant(Long id, RestaurantRequest request);
+    RestaurantDTO updateRating(Long id, Double rating);
     void deleteRestaurant(Long id);
     List<MenuItemDTO> getMenu(Long restaurantId);
     MenuItemDTO getMenuItem(Long restaurantId, Long itemId);

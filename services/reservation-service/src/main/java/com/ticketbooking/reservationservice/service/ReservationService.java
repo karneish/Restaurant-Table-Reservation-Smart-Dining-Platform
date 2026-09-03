@@ -1,6 +1,9 @@
 package com.ticketbooking.reservationservice.service;
 
+import com.ticketbooking.common.dto.BillDTO;
 import com.ticketbooking.common.dto.CompanionSummaryDTO;
+import com.ticketbooking.common.dto.FeedbackDTO;
+import com.ticketbooking.common.dto.FeedbackRequest;
 import com.ticketbooking.common.dto.OccasionAddOnDTO;
 import com.ticketbooking.common.dto.ReservationDTO;
 import com.ticketbooking.common.dto.ReservationRequest;
@@ -27,4 +30,10 @@ public interface ReservationService {
     CompanionSummaryDTO getCompanionSummary(String reservationId);
     CompanionSummaryDTO callWaiter(String reservationId);
     CompanionSummaryDTO requestBill(String reservationId);
+
+    BillDTO getBill(String reservationId);
+    BillDTO payBill(String reservationId, String paymentMethod);
+
+    FeedbackDTO submitFeedback(String reservationId, FeedbackRequest request, String userEmail);
+    List<FeedbackDTO> getFeedbackForRestaurant(Long restaurantId);
 }

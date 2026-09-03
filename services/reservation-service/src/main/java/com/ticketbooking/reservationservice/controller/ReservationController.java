@@ -1,6 +1,9 @@
 package com.ticketbooking.reservationservice.controller;
 
+import com.ticketbooking.common.dto.BillDTO;
 import com.ticketbooking.common.dto.CompanionSummaryDTO;
+import com.ticketbooking.common.dto.FeedbackDTO;
+import com.ticketbooking.common.dto.FeedbackRequest;
 import com.ticketbooking.common.dto.OccasionAddOnDTO;
 import com.ticketbooking.common.dto.ReservationDTO;
 import com.ticketbooking.common.dto.ReservationRequest;
@@ -89,6 +92,38 @@ public class ReservationController {
     @Operation(summary = "Companion: request the bill")
     public ResponseEntity<APIResponse<CompanionSummaryDTO>> requestBill(@PathVariable String reservationId) {
         return ResponseEntity.ok(APIResponse.success("Bill requested", reservationService.requestBill(reservationId)));
+    }
+
+    @GetMapping("/companion/{reservationId}/bill")
+    @Operation(summary = "Companion: view the itemized bill (QR-safe)")
+    public ResponseEntity<APIResponse<BillDTO>> getBill(@PathVariable String reservationId) {
+        return ResponseEntity.ok(APIResponse.success("Bill fetched", reservationService.getBill(reservationId)));
+    }
+
+    @PostMapping("/companion/{reservationId}/pay-bill")
+    @Operation(summary = "Companion: settle the bill via virtual QR payment (auto-completes the visit)")
+    public ResponseEntity<APIResponse<BillDTO>> payBill(
+            @PathVariable String reservationId,
+            @RequestBody Map<String, String> request) {
+        BillDTO bill = reservationService.payBill(reservationId, request.getOrDefault("paymentMethod", "UPI"));
+        return ResponseEntity.ok(APIResponse.success("Bill settled. Thank you for dining with us!", bill));
+    }
+
+    @PostMapping("/{reservationId}/feedback")
+    @Operation(summary = "Submit guest feedback after a completed visit (QR-safe)")
+    public ResponseEntity<APIResponse<FeedbackDTO>> submitFeedback(
+            @PathVariable String reservationId,
+            @Valid @RequestBody FeedbackRequest request,
+            @RequestHeader(value = "X-User-Email", required = false) String userEmail) {
+        FeedbackDTO feedback = reservationService.submitFeedback(reservationId, request, userEmail);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(APIResponse.success("Thanks for your feedback!", feedback));
+    }
+
+    @GetMapping("/feedback/restaurant/{restaurantId}")
+    @Operation(summary = "Get guest feedback for a restaurant (Admin)")
+    public ResponseEntity<APIResponse<List<FeedbackDTO>>> getRestaurantFeedback(@PathVariable Long restaurantId) {
+        return ResponseEntity.ok(APIResponse.success("Feedback fetched", reservationService.getFeedbackForRestaurant(restaurantId)));
     }
 
     @GetMapping("/{id}")

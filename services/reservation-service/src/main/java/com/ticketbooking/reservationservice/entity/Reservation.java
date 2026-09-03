@@ -44,6 +44,13 @@ public class Reservation {
     @Column(name = "bill_requested")
     @Builder.Default
     private Boolean billRequested = false;
+    @Column(name = "bill_paid")
+    @Builder.Default
+    private Boolean billPaid = false;
+    @Column(name = "bill_amount")
+    private BigDecimal billAmount;
+    @Column(name = "bill_paid_at")
+    private LocalDateTime billPaidAt;
     @Column(name = "hold_expires_at")
     private LocalDateTime holdExpiresAt;
     @OneToMany(mappedBy = "reservation", cascade = CascadeType.ALL, fetch = FetchType.LAZY) @Builder.Default
@@ -52,10 +59,21 @@ public class Reservation {
     private List<ReservedTable> reservedTables = new ArrayList<>();
     @OneToOne(mappedBy = "reservation", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private PreOrder preOrder;
-    @OneToOne(mappedBy = "reservation", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private Payment payment;
+    @OneToMany(mappedBy = "reservation", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true) @Builder.Default
+    private List<Payment> payments = new ArrayList<>();
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    /**
+     * Deposit payment of this reservation (legacy single-payment access).
+     * Null payments default to DEPOSIT for rows created before bill payments existed.
+     */
+    public Payment getPayment() {
+        return payments == null ? null : payments.stream()
+                .filter(Payment::isDepositPayment)
+                .findFirst()
+                .orElse(null);
+    }
 
     @PrePersist
     protected void onCreate() { createdAt = LocalDateTime.now(); updatedAt = LocalDateTime.now(); }

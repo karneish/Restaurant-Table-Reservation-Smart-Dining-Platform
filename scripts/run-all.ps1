@@ -20,8 +20,8 @@ Write-Host "`nAll services started!" -ForegroundColor Green
 Write-Host "  Frontend:         http://localhost:3000"
 Write-Host "  API Gateway:      http://localhost:8080"
 Write-Host "  Service Registry: http://localhost:8761"
-Write-Host "  pgAdmin4:         http://localhost:5050  (admin@ticketbooking.com / root123)"
-Write-Host "  PostgreSQL 18:    localhost:5432  db=ticket_booking_system_db  user=ticket_user  pass=root123"
+Write-Host "  pgAdmin4:         http://localhost:5051  (admin@ticketbooking.com / root123)"
+Write-Host "  PostgreSQL 18:    localhost:5433  db=ticket_booking_system_db  user=ticket_user  pass=root123"
 
 Write-Host "`nCommands:"
 Write-Host "  View logs:      docker compose logs -f"
