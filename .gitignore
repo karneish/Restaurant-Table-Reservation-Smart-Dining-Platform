@@ -1,4 +1,4 @@
-# Java
+﻿# Java
 *.class
 *.jar
 *.war
@@ -30,6 +30,7 @@ logs/
 # Env
 .env
 .env.local
+.env.production
 *.env
 
 # Maven
@@ -42,3 +43,16 @@ frontend/dist/
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Docker
+docker/data/
+
+# Backups
+backups/
+
+# IDE
+*.launch
+.settings/
+.classpath
+.project
+.factorypath
