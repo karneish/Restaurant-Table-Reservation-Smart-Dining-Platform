@@ -53,11 +53,12 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config;
 
-    // Retry on 429 (rate limit) with exponential backoff — up to 3 attempts
+    // Retry on 429 (rate limit / free-tier instance warming up) with
+    // exponential backoff — up to 5 attempts for transient platform throttling.
     if (error.response?.status === 429 && !original?._retry429) {
       original._retry429 = (original._retry429 || 0) + 1;
-      if (original._retry429 <= 3) {
-        const delay = Math.min(1000 * 2 ** (original._retry429 - 1), 8000);
+      if (original._retry429 <= 5) {
+        const delay = Math.min(2000 * 2 ** (original._retry429 - 1), 15000);
         await new Promise((r) => setTimeout(r, delay));
         return api(original);
       }
