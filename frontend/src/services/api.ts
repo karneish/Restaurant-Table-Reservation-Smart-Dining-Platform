@@ -10,7 +10,7 @@ import { GUEST_EMAIL } from '../context/AuthContext';
 const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
-  timeout: 30000,
+  timeout: 60000,
 });
 
 api.interceptors.request.use((config) => {
@@ -28,7 +28,7 @@ async function tryRefresh(): Promise<boolean> {
   const rt = localStorage.getItem('refreshToken');
   if (!rt) return false;
   try {
-    const res = await axios.post<APIResponse<AuthResponse>>('/api/auth/refresh', { refreshToken: rt });
+    const res = await axios.post<APIResponse<AuthResponse>>('/api/auth/refresh', { refreshToken: rt }, { timeout: 60000 });
     const data = res.data.data;
     localStorage.setItem('token', data.token);
     localStorage.setItem('refreshToken', data.refreshToken);
@@ -63,6 +63,17 @@ api.interceptors.response.use(
       }
     }
 
+    // Retry on timeout / network errors (cold-started or overloaded server) — up to 2 attempts
+    const retryable = !error.response && !original?._retryNetwork;
+    if (retryable) {
+      original._retryNetwork = (original._retryNetwork || 0) + 1;
+      if (original._retryNetwork <= 2) {
+        const delay = Math.min(1500 * 2 ** (original._retryNetwork - 1), 4000);
+        await new Promise((r) => setTimeout(r, delay));
+        return api(original);
+      }
+    }
+
     if (error.response?.status !== 401 || original?._retry || original?.url?.includes('/auth/')) {
       return Promise.reject(error);
     }
@@ -82,6 +93,9 @@ api.interceptors.response.use(
 export function errorMessage(err: unknown, fallback = 'Something went wrong'): string {
   if (axios.isAxiosError(err)) {
     if (err.response?.status === 429) return 'Server is busy. Please try again in a moment.';
+    if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT')
+      return 'The server is taking too long to respond. Please try again.';
+    if (!err.response) return 'Cannot reach the server. Please check your connection.';
     const data = err.response?.data as { message?: string } | undefined;
     return data?.message || err.message || fallback;
   }
