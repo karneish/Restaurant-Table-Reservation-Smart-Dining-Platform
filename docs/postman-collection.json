@@ -1,0 +1,25 @@
+﻿{
+  "info": {
+    "name": "TableHub API Collection",
+    "description": "Complete API collection for TableHub Restaurant Reservation System",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        { "name": "Register", "request": { "method": "POST", "url": "{{baseUrl}}/auth/register" } },
+        { "name": "Login", "request": { "method": "POST", "url": "{{baseUrl}}/auth/login" } },
+        { "name": "Refresh Token", "request": { "method": "POST", "url": "{{baseUrl}}/auth/refresh" } }
+      ]
+    },
+    {
+      "name": "Restaurants",
+      "item": [
+        { "name": "List All", "request": { "method": "GET", "url": "{{baseUrl}}/restaurants" } },
+        { "name": "Get By ID", "request": { "method": "GET", "url": "{{baseUrl}}/restaurants/{{restaurantId}}" } },
+        { "name": "Search", "request": { "method": "GET", "url": "{{baseUrl}}/restaurants/search?q={{query}}" } }
+      ]
+    }
+  ]
+}
