@@ -1,4 +1,4 @@
-﻿package com.ticketbooking.common.enums;
+package com.ticketbooking.common.enums;
 public enum CleaningStatus {
     READY, DIRTY, CLEANING;
     public boolean canTransitionTo(CleaningStatus next) {

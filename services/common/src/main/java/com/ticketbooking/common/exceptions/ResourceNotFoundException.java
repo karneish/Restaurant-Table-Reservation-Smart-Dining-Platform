@@ -1,4 +1,4 @@
-﻿package com.ticketbooking.common.exceptions;
+package com.ticketbooking.common.exceptions;
 public class ResourceNotFoundException extends RuntimeException {
     private final String resourceName;
     private final String field;

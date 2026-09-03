@@ -1,4 +1,4 @@
-﻿package com.ticketbooking.common.exceptions;
+package com.ticketbooking.common.exceptions;
 public class BadRequestException extends RuntimeException {
     private final String errorCode;
     public BadRequestException(String message) { super(message); this.errorCode = "BAD_REQUEST"; }

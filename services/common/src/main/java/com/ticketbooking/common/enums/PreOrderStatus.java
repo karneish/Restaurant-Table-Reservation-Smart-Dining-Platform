@@ -1,4 +1,4 @@
-﻿package com.ticketbooking.common.enums;
+package com.ticketbooking.common.enums;
 public enum PreOrderStatus {
     DRAFT, PLACED, IN_PREP, SERVED;
     public boolean canTransitionTo(PreOrderStatus next) {

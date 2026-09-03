@@ -1,4 +1,4 @@
-﻿package com.ticketbooking.common.dto;
+ackage com.ticketbooking.common.dto;
 public class TableMatchRequest {
     private Long restaurantId; private int partySize; private String zone;
     private boolean wheelchairAccessible; private boolean quietCorner; private String occasion;

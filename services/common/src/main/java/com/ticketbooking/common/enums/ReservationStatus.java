@@ -1,4 +1,4 @@
-﻿package com.ticketbooking.common.enums;
+package com.ticketbooking.common.enums;
 public enum ReservationStatus {
     HOLD, CONFIRMED, SEATED, COMPLETED, CANCELLED, NO_SHOW;
     public boolean canTransitionTo(ReservationStatus next) {

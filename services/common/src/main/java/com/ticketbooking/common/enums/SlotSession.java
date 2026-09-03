@@ -1,4 +1,4 @@
-﻿package com.ticketbooking.common.enums;
+package com.ticketbooking.common.enums;
 public enum SlotSession {
     BREAKFAST("07:00","11:00"), LUNCH("11:30","15:00"), EVENING("15:00","18:00"),
     DINNER("18:30","22:00"), LATE_NIGHT("22:00","23:59");

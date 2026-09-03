@@ -1,4 +1,5 @@
 import { ReactNode, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -28,8 +29,8 @@ export default function Modal({ open, onClose, title, subtitle, icon, children, 
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 overflow-y-auto">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto">
       <div className="absolute inset-0 bg-ink/50 backdrop-blur-sm animate-fade-in" onClick={onClose} />
       <div
         className={`relative w-full ${wide ? 'max-w-2xl' : 'max-w-md'} rounded-3xl bg-white shadow-card-lg animate-zoom-in my-auto`}
@@ -61,6 +62,7 @@ export default function Modal({ open, onClose, title, subtitle, icon, children, 
         <div className="px-6 py-5">{children}</div>
         {footer && <div className="px-6 pb-6 pt-1">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

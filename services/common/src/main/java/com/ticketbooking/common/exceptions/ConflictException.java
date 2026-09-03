@@ -1,4 +1,4 @@
-﻿package com.ticketbooking.common.exceptions;
+package com.ticketbooking.common.exceptions;
 public class ConflictException extends RuntimeException {
     private final String errorCode;
     public ConflictException(String msg) { super(msg); this.errorCode = "CONFLICT"; }

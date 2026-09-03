@@ -1,4 +1,4 @@
-﻿package com.ticketbooking.common.enums;
+package com.ticketbooking.common.enums;
 public enum TableZone {
     INDOOR("Indoor Seating"), OUTDOOR("Outdoor/Patio"), BAR("Bar Area"),
     VIP("VIP Section"), PRIVATE("Private Dining"), WINDOW("Window Side");

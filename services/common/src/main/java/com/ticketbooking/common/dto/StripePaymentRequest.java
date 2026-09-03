@@ -1,4 +1,4 @@
-﻿package com.ticketbooking.common.dto;
+ackage com.ticketbooking.common.dto;
 public class StripePaymentRequest {
     private String amount;
     private String currency;

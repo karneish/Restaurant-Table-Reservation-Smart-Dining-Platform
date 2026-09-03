@@ -1,4 +1,4 @@
-﻿package com.ticketbooking.common.enums;
+package com.ticketbooking.common.enums;
 public enum NotificationType {
     RESERVATION_CONFIRMED, RESERVATION_CANCELLED, RESERVATION_REMINDER,
     WAITLIST_AVAILABLE, PAYMENT_RECEIVED, PAYMENT_FAILED,

@@ -1,14 +1,14 @@
 ﻿export interface ValidationResult { valid: boolean; errors: string[]; }
 export function required(value: unknown, field: string): string | null {
-  if (value === null || value === undefined || value === '') return ${field} is required;
-  if (typeof value === 'string' && value.trim().length === 0) return ${field} cannot be empty;
+  if (value === null || value === undefined || value === '') return `${field} is required`;
+  if (typeof value === 'string' && value.trim().length === 0) return `${field} cannot be empty`;
   return null;
 }
 export function minLength(value: string, min: number, field: string): string | null {
-  return value.length < min ? ${field} must be at least  characters : null;
+  return value.length < min ? `${field} must be at least ${min} characters` : null;
 }
 export function maxLength(value: string, max: number, field: string): string | null {
-  return value.length > max ? ${field} must be no more than  characters : null;
+  return value.length > max ? `${field} must be no more than ${max} characters` : null;
 }
 export function validEmail(value: string): string | null {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? null : 'Invalid email address';

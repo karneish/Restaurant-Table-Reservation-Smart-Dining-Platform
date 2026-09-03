@@ -1,4 +1,4 @@
-﻿package com.ticketbooking.common.exceptions;
+package com.ticketbooking.common.exceptions;
 public class UnauthorizedException extends RuntimeException {
     private final String errorCode;
     public UnauthorizedException(String msg) { super(msg); this.errorCode = "UNAUTHORIZED"; }

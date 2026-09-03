@@ -1,4 +1,4 @@
-﻿package com.ticketbooking.common.constants;
+package com.ticketbooking.common.constants;
 public final class AppConstants {
     private AppConstants() {}
     public static final String GUEST_EMAIL = "guest@tablehub.com";
