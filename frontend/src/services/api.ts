@@ -52,6 +52,17 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config;
+
+    // Retry on 429 (rate limit) with exponential backoff — up to 3 attempts
+    if (error.response?.status === 429 && !original?._retry429) {
+      original._retry429 = (original._retry429 || 0) + 1;
+      if (original._retry429 <= 3) {
+        const delay = Math.min(1000 * 2 ** (original._retry429 - 1), 8000);
+        await new Promise((r) => setTimeout(r, delay));
+        return api(original);
+      }
+    }
+
     if (error.response?.status !== 401 || original?._retry || original?.url?.includes('/auth/')) {
       return Promise.reject(error);
     }
@@ -70,6 +81,7 @@ api.interceptors.response.use(
 /** Pull a human-readable message out of an API error. */
 export function errorMessage(err: unknown, fallback = 'Something went wrong'): string {
   if (axios.isAxiosError(err)) {
+    if (err.response?.status === 429) return 'Server is busy. Please try again in a moment.';
     const data = err.response?.data as { message?: string } | undefined;
     return data?.message || err.message || fallback;
   }
