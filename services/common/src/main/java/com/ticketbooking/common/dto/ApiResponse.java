@@ -1,4 +1,4 @@
-ackage com.ticketbooking.common.dto;
+package com.ticketbooking.common.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.LocalDateTime;
 @JsonInclude(JsonInclude.Include.NON_NULL)

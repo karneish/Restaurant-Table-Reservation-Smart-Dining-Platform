@@ -15,6 +15,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   login: (email: string, password: string) => Promise<boolean>;
+  demoLogin: (admin?: boolean) => Promise<boolean>;
   register: (data: { name: string; email: string; password: string; phone?: string }) => Promise<boolean>;
   logout: () => void;
   refresh: () => Promise<void>;
@@ -69,8 +70,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data.emailVerified;
   }, []);
 
-  const register = useCallback(async (data: { name: string; email: string; password: string; phone?: string }) => {
-    const res = await authAPI.register(data);
+  const demoLogin = useCallback(async (admin = false) => {
+    const res = await authAPI.demo(admin);
+    const data = res.data.data;
+    persistAuth(data);
+    setToken(data.token);
+    setUserEmail(data.email);
+    setUserName(data.name);
+    setUserRole(data.role);
+    setUserId(data.userId);
+    setEmailVerified(true);
+    return true;
+  }, []);
+
+  const register = useCallback(async (data: { name: string; email: string; password: string; phone?: string }) => {    const res = await authAPI.register(data);
     const auth = res.data.data;
     persistAuth(auth);
     setToken(auth.token);
@@ -138,6 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           isAuthenticated: !!token,
           isAdmin: userRole === 'ADMIN',
           login,
+          demoLogin,
           register,
           logout,
           refresh,

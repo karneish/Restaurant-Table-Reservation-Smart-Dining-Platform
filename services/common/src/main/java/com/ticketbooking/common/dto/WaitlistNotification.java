@@ -1,4 +1,4 @@
-ackage com.ticketbooking.common.dto;
+package com.ticketbooking.common.dto;
 public class WaitlistNotification {
     private Long waitlistId;
     private String userEmail;

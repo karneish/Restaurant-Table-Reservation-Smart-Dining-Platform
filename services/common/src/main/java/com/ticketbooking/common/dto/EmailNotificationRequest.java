@@ -1,4 +1,4 @@
-ackage com.ticketbooking.common.dto;
+package com.ticketbooking.common.dto;
 public class EmailNotificationRequest {
     private String to;
     private String subject;

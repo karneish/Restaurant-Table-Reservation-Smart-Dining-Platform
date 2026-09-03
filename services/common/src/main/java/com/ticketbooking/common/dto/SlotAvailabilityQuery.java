@@ -1,4 +1,4 @@
-ackage com.ticketbooking.common.dto;
+package com.ticketbooking.common.dto;
 import java.time.LocalDate;
 public class SlotAvailabilityQuery {
     private Long restaurantId; private LocalDate date; private int partySize; private String zone;

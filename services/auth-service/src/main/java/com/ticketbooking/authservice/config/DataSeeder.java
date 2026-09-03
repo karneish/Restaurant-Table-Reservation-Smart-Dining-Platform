@@ -44,6 +44,26 @@ public class DataSeeder implements CommandLineRunner {
                 .emailVerified(true)
                 .build());
 
-        log.info("Auth DB seeded with admin and customer users");
+        userRepository.save(User.builder()
+                .name("Demo Customer")
+                .email("demo@tablehub.com")
+                .password(passwordEncoder.encode("demo123"))
+                .phone("9876500001")
+                .address("Bangalore, India")
+                .role(Role.CUSTOMER)
+                .emailVerified(true)
+                .build());
+
+        userRepository.save(User.builder()
+                .name("Demo Admin")
+                .email("demo.admin@tablehub.com")
+                .password(passwordEncoder.encode("admin123"))
+                .phone("9876500002")
+                .address("Mumbai, Maharashtra")
+                .role(Role.ADMIN)
+                .emailVerified(true)
+                .build());
+
+        log.info("Auth DB seeded with admin, customer, and demo users");
     }
 }

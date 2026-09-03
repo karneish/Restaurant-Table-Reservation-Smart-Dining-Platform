@@ -1,4 +1,4 @@
-ackage com.ticketbooking.common.dto;
+package com.ticketbooking.common.dto;
 import java.util.List;
 public class PaginationResponse<T> {
     private List<T> content; private int page; private int size;

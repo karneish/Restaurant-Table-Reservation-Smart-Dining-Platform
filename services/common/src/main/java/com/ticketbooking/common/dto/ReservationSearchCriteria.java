@@ -1,4 +1,4 @@
-ackage com.ticketbooking.common.dto;
+package com.ticketbooking.common.dto;
 import java.time.LocalDateTime;
 public class ReservationSearchCriteria {
     private String userEmail;

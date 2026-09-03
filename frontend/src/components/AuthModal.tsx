@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import toast from 'react-hot-toast';
-import { LogIn, UserPlus, Mail, Lock, Phone, Eye, EyeOff, ShieldCheck, RefreshCw } from 'lucide-react';
+import { LogIn, UserPlus, Mail, Lock, Phone, Eye, EyeOff, ShieldCheck, RefreshCw, Sparkles, UserCog } from 'lucide-react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import { Field, Input } from './ui/Input';
@@ -14,9 +14,10 @@ interface AuthModalProps {
 }
 
 export default function AuthModal({ open, onClose, initialMode = 'login' }: AuthModalProps) {
-  const { login, register, verifyOtp, sendOtp } = useAuth();
+  const { login, demoLogin, register, verifyOtp, sendOtp } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState<'customer' | 'admin' | null>(null);
   const [showPw, setShowPw] = useState(false);
   const [otpView, setOtpView] = useState(false);
   const [otp, setOtp] = useState('');
@@ -103,6 +104,19 @@ export default function AuthModal({ open, onClose, initialMode = 'login' }: Auth
     setMode((m) => (m === 'login' ? 'register' : 'login'));
     setOtpView(false);
     setForm({ name: '', email: '', phone: '', password: '', confirm: '' });
+  };
+
+  const useDemo = async (admin: boolean) => {
+    setDemoLoading(admin ? 'admin' : 'customer');
+    try {
+      await demoLogin(admin);
+      toast.success(admin ? 'Logged in as Demo Admin' : 'Logged in as Demo Customer');
+      onClose();
+    } catch (err) {
+      toast.error(errorMessage(err, 'Demo login failed. Is the server running?'));
+    } finally {
+      setDemoLoading(null);
+    }
   };
 
   if (otpView) {
@@ -232,6 +246,39 @@ export default function AuthModal({ open, onClose, initialMode = 'login' }: Auth
           {loading ? 'Please wait...' : mode === 'login' ? 'Sign In' : 'Create Account'}
         </Button>
       </form>
+
+      {mode === 'login' && (
+        <div className="mt-6">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="flex-1 h-px bg-forest-100" />
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-forest-400">or explore instantly</span>
+            <span className="flex-1 h-px bg-forest-100" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => useDemo(false)}
+              disabled={demoLoading !== null}
+              className="w-full"
+            >
+              {demoLoading === 'customer' ? <Spinner className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
+              Demo Customer
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => useDemo(true)}
+              disabled={demoLoading !== null}
+              className="w-full"
+            >
+              {demoLoading === 'admin' ? <Spinner className="w-4 h-4" /> : <UserCog className="w-4 h-4" />}
+              Demo Admin
+            </Button>
+          </div>
+          <p className="text-[11px] text-center text-forest-400 mt-2">
+            One-click access to a fully populated demo account &middot; no sign-up needed
+          </p>
+        </div>
+      )}
 
       <p className="text-center text-sm text-forest-500 mt-5">
         {mode === 'login' ? 'New to TableHub?' : 'Already have an account?'}{' '}

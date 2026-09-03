@@ -94,6 +94,8 @@ export const authAPI = {
     api.post<APIResponse<AuthResponse>>('/auth/register', data),
   login: (data: { email: string; password: string }) =>
     api.post<APIResponse<AuthResponse>>('/auth/login', data),
+  demo: (admin = false) =>
+    api.post<APIResponse<AuthResponse>>('/auth/demo', { admin }),
   refresh: (refreshToken: string) =>
     api.post<APIResponse<AuthResponse>>('/auth/refresh', { refreshToken }),
   sendOtp: (email: string) =>

@@ -1,4 +1,4 @@
-ackage com.ticketbooking.common.dto;
+package com.ticketbooking.common.dto;
 import java.time.LocalDateTime;
 public class CleaningLogDTO {
     private Long tableId;

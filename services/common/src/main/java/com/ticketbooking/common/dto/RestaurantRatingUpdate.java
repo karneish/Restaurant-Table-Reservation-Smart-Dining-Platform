@@ -1,4 +1,4 @@
-ackage com.ticketbooking.common.dto;
+package com.ticketbooking.common.dto;
 public class RestaurantRatingUpdate {
     private Long restaurantId;
     private double averageRating;

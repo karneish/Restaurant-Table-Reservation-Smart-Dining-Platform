@@ -108,6 +108,50 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional
+    public AuthResponse demoLogin(boolean admin) {
+        String email = admin ? "demo.admin@tablehub.com" : "demo@tablehub.com";
+        String rawPassword = admin ? "admin123" : "demo123";
+        String name = admin ? "Demo Admin" : "Demo Customer";
+        Role role = admin ? Role.ADMIN : Role.CUSTOMER;
+
+        // Find or create the demo user so the demo always works, even on an already-seeded DB.
+        User user = userRepository.findByEmail(email)
+                .orElseGet(() -> {
+                    User created = User.builder()
+                            .name(name)
+                            .email(email)
+                            .password(passwordEncoder.encode(rawPassword))
+                            .phone(admin ? "9876500002" : "9876500001")
+                            .address(admin ? "Mumbai, Maharashtra" : "Bangalore, India")
+                            .role(role)
+                            .emailVerified(true)
+                            .build();
+                    userRepository.save(created);
+                    userServiceClient.createProfile(created.getId(), created.getName(), created.getEmail(),
+                            created.getPhone(), created.getAddress(), created.getRole().name());
+                    return created;
+                });
+
+        String token = jwtTokenProvider.generateToken(user.getEmail(), user.getRole().name());
+        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getEmail());
+        String message = admin ? "Logged in as Demo Admin" : "Logged in as Demo Customer";
+
+        log.info("Demo user logged in: {}", user.getEmail());
+        return AuthResponse.builder()
+                .token(token)
+                .refreshToken(refreshToken)
+                .tokenType("Bearer")
+                .userId(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .role(user.getRole().name())
+                .emailVerified(true)
+                .message(message)
+                .build();
+    }
+
+    @Override
     public AuthResponse refreshToken(String refreshToken) {
         if (!jwtTokenProvider.validateToken(refreshToken)) {
             throw new InvalidCredentialsException("Invalid refresh token");

@@ -10,4 +10,5 @@ public interface AuthService {
     AuthResponse refreshToken(String refreshToken);
     void sendOtp(String email);
     boolean verifyOtp(String email, String otp);
+    AuthResponse demoLogin(boolean admin);
 }

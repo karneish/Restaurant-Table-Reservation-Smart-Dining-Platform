@@ -38,6 +38,14 @@ public class AuthController {
         return ResponseEntity.ok(APIResponse.success("Login successful", response));
     }
 
+    @PostMapping("/demo")
+    @Operation(summary = "Login with a demo account (customer by default, admin if admin=true)")
+    public ResponseEntity<APIResponse<AuthResponse>> demo(@RequestBody(required = false) Map<String, Boolean> request) {
+        boolean admin = request != null && Boolean.TRUE.equals(request.get("admin"));
+        AuthResponse response = authService.demoLogin(admin);
+        return ResponseEntity.ok(APIResponse.success("Demo login successful", response));
+    }
+
     @PostMapping("/refresh")
     @Operation(summary = "Refresh access token")
     public ResponseEntity<APIResponse<AuthResponse>> refresh(@RequestBody Map<String, String> request) {
